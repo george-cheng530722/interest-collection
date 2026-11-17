@@ -6,7 +6,11 @@ import { corsBlockedFetch, dialog, htmlResponse, jsonResponse, makeDevice, makeI
 describe('功能: 刪除、失效連結與縮圖更新', () => {
   it('情境: 刪除前要確認', async () => {
     const device = makeDevice();
-    const store = await device.open(); // 使用首次開啟的示範資料
+    const store = await device.open();
+    await preload(store, [
+      makeItem({ id: 'keep', name: '河岸咖啡', url: 'https://www.instagram.com/coffee/p/KEEP1/' }),
+      makeItem({ id: 'gone', name: '北部週末', source: 'Threads', url: 'https://www.threads.net/@weekend.north/post/WalkReal/', handle: 'weekend.north' }),
+    ]);
     const { user, unmount } = await renderApp({ store });
     await user.click(screen.getByRole('button', { name: '北部週末' }));
     await user.click(screen.getByRole('button', { name: '刪除這則收藏' }));
@@ -23,11 +27,12 @@ describe('功能: 刪除、失效連結與縮圖更新', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: '北部週末' })).toBeNull());
     await waitFor(async () => expect((await store.getItems()).some((i) => i.name === '北部週末')).toBe(false));
 
-    // 重整：資料在本機，刪除仍有效；示範資料也不會被寫回
+    // 重整：資料在本機，刪除仍有效，也不會寫回任何範例
     unmount();
     render(<App store={await device.open()} fetchImpl={corsBlockedFetch() as unknown as typeof fetch} />);
-    await screen.findByRole('button', { name: '河岸散策' });
+    await screen.findByRole('button', { name: '河岸咖啡' });
     expect(screen.queryByRole('button', { name: '北部週末' })).toBeNull();
+    expect(screen.queryByTestId('empty-state')).toBeNull();
   });
 
   it('情境: 連結失效時詢問是否刪除', async () => {
@@ -35,7 +40,7 @@ describe('功能: 刪除、失效連結與縮圖更新', () => {
     await preload(store, [makeItem({ id: 'd', name: '已刪貼文', source: 'X', url: 'https://x.com/someone/status/1' })]);
     // 真的偵測：X 公開 oEmbed 回 404 → 判定失效
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).startsWith('https://publish.twitter.com/oembed')) return new Response('', { status: 404 });
+      if (String(input).startsWith('https://publish.x.com/oembed')) return new Response('', { status: 404 });
       throw new TypeError('Failed to fetch');
     });
     const { user } = await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
@@ -49,9 +54,9 @@ describe('功能: 刪除、失效連結與縮圖更新', () => {
     expect(within(card).getByText('連結失效')).toBeInTheDocument();
     expect((await store.getItems())[0].linkDead).toBe(true);
 
-    // 用示範按鈕重現，選擇刪除（刪除仍需再確認一次）
+    // 再檢查一次，選擇刪除（刪除仍需再確認一次）
     await user.click(card);
-    await user.click(screen.getByRole('button', { name: '模擬連結失效' }));
+    await user.click(screen.getByRole('button', { name: '檢查連結與更新縮圖' }));
     dlg = await dialog('連結似乎已失效');
     await user.click(within(dlg).getByRole('button', { name: '刪除' }));
     await user.click(within(await dialog('刪除這則收藏？')).getByRole('button', { name: '確定刪除' }));
@@ -90,7 +95,7 @@ describe('功能: 刪除、失效連結與縮圖更新', () => {
     const oldThumb = 'https://scontent.cdninstagram.com/v/old.jpg?oe=65000000';
     await preload(store, [makeItem({ id: 't', name: '河岸散策', thumbUrl: oldThumb, thumbState: 'expired' })]);
     const fetchImpl = corsBlockedFetch();
-    const { user } = await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
+    await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
     await waitFor(() => expect(screen.getByTestId('thumb')).toHaveAttribute('data-thumb-state', 'failed'));
     expect(fetchImpl).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '河岸散策' })).toBeInTheDocument();
@@ -98,14 +103,7 @@ describe('功能: 刪除、失效連結與縮圖更新', () => {
     expect(screen.getByText('更新失敗，保留原縮圖')).toBeInTheDocument();
     const [saved] = await store.getItems();
     expect(saved).toMatchObject({ thumbUrl: oldThumb, thumbState: 'failed', name: '河岸散策' });
-
-    // 「模擬縮圖過期」會再跑一次真的更新邏輯；沒有既有圖時顯示後備圖示
-    await user.click(screen.getByRole('button', { name: '河岸散策' }));
-    const calls = fetchImpl.mock.calls.length;
-    await user.click(screen.getByRole('button', { name: '模擬縮圖過期' }));
-    await waitFor(() => expect(fetchImpl.mock.calls.length).toBeGreaterThan(calls));
-    await waitFor(() => expect(screen.getByTestId('thumb')).toHaveAttribute('data-thumb-state', 'failed'));
-    expect(screen.getByTestId('detail-name')).toHaveTextContent('河岸散策');
+    expect(screen.queryByRole('button', { name: '模擬縮圖過期' })).toBeNull();
   });
 
   it('遠端縮圖載入失敗時顯示後備圖示並自動嘗試更新', async () => {

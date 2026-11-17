@@ -67,9 +67,9 @@ export function ManualSheet({ draft, reason, onChange, onCancel, onSave }: { dra
         <input id="manual-url" type="text" value={draft.url} readOnly className="readonly" />
       </div>
       <div className="tags"><span className="muted">來源</span><SourceTag source={draft.source} /><span className="muted small">{shortUrl(draft.url)}</span></div>
-      <Field label="名稱" required value={draft.name} onChange={(name) => onChange({ name })} placeholder="例如：隱藏台北小吃" />
+      <Field label="名稱" required value={draft.name} onChange={(name) => onChange({ name })} placeholder="例如：大稻埕拉麵" />
       <Field label="說明" value={draft.caption} onChange={(caption) => onChange({ caption })} placeholder="這則貼文在說什麼？" multiline />
-      <Field label="帳號" required value={draft.handle} onChange={(handle) => onChange({ handle: handle.replace(/^@/, '').trim() })} placeholder="例如：hidden.taipei.eats" />
+      <Field label="帳號" required value={draft.handle} onChange={(handle) => onChange({ handle: handle.replace(/^@/, '').trim() })} placeholder="例如：aming.ramen" />
       <div className="label">分類（必填）</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填；不明時先填「其他」）</div>

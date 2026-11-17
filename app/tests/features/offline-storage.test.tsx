@@ -19,7 +19,7 @@ describe('功能: 單機儲存與離線使用', () => {
     await renderApp({ store });
     expect(screen.queryAllByRole('button', { name: /登入|註冊|綁定|sign in|log in/i })).toHaveLength(0);
     expect(screen.queryByLabelText(/密碼|password|email/i)).toBeNull();
-    expect(screen.getAllByTestId('item-card').length).toBeGreaterThan(0); // 直接看到收藏
+    expect(screen.getByTestId('empty-state')).toBeInTheDocument();
   });
 
   it('情境: 收藏資料只存在本機', async () => {

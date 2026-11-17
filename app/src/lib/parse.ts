@@ -28,12 +28,37 @@ export function extractPostUrl(text: string): string | null {
 
 const TRACKING = /^(utm_|igsh|igshid|img_index|s$|t$|ref_src|ref_url|xmt|slof|openExternalBrowser)/i;
 
+function bareHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/^(www|mobile|m)\./, '');
+}
+
+/**
+ * 整理貼上的網址。
+ * X／Twitter（含 iOS App 分享的 ?s=46&t=…、twitter.com、mobile.twitter.com、/i/web/status/）
+ * 會改成 https://x.com/{帳號}/status/{id} 或 https://x.com/i/status/{id}，並去掉全部查詢參數。
+ * oEmbed 不接受 /i/web/status/（會 404），所以要先改成 /i/status/。
+ */
 export function normalizeUrl(raw: string): string {
   try {
     const u = new URL(raw.trim());
     u.hash = '';
+    const bare = bareHost(u.hostname);
+    if (bare === 'x.com' || bare === 'twitter.com') {
+      u.protocol = 'https:';
+      u.hostname = 'x.com';
+      u.search = '';
+      const parts = u.pathname.split('/').filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
+      const statusAt = parts.findIndex((p) => p.toLowerCase() === 'status');
+      const id = statusAt >= 0 ? parts[statusAt + 1] : '';
+      if (id && /^\d+$/.test(id)) {
+        const user = statusAt === 0 ? '' : parts[0];
+        u.pathname = !user || user.toLowerCase() === 'i' ? `/i/status/${id}` : `/${user}/status/${id}`;
+      } else {
+        u.pathname = '/' + parts.join('/');
+      }
+      return u.toString();
+    }
     [...u.searchParams.keys()].forEach((k) => { if (TRACKING.test(k)) u.searchParams.delete(k); });
-    if (u.hostname === 'twitter.com' || u.hostname === 'www.twitter.com' || u.hostname === 'mobile.twitter.com' || u.hostname === 'mobile.x.com') u.hostname = 'x.com';
     return u.toString();
   } catch { return raw.trim(); }
 }

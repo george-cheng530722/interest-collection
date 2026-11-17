@@ -14,8 +14,8 @@ const TARGETS = [
 ];
 // App 也會嘗試的公開 oEmbed 端點（不需金鑰者）
 const OEMBED = [
+  'https://publish.x.com/oembed?omit_script=1&url=' + encodeURIComponent('https://x.com/jack/status/20'),
   'https://publish.twitter.com/oembed?omit_script=1&url=' + encodeURIComponent('https://x.com/jack/status/20'),
-  'https://publish.twitter.com/oembed?omit_script=1&url=' + encodeURIComponent('https://twitter.com/jack/status/20'),
   'https://graph.threads.net/v1.0/oembed?url=' + encodeURIComponent('https://www.threads.net/@natgeo/post/C7XSa54NOw1'),
   'https://api.instagram.com/oembed/?url=' + encodeURIComponent('https://www.instagram.com/natgeo/p/DHrUZ11yOh0/'),
 ];

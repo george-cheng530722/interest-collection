@@ -1,6 +1,7 @@
 import type { Item, Settings } from './types';
 import { DEFAULT_SETTINGS } from './types';
-import { seedItems } from './constants';
+import { DEMO_ITEM_IDS, DEMO_ITEM_URLS } from './constants';
+import { sameUrl } from './parse';
 
 export type StoreKind = 'indexeddb' | 'localstorage' | 'memory';
 
@@ -130,13 +131,20 @@ export async function openBestStore(): Promise<Store> {
   return memoryStore();
 }
 
-/** 第一次開啟才寫入示範資料；之後即使使用者刪除，也不會再寫回 */
-export async function ensureSeeded(store: Store): Promise<void> {
-  const seeded = await store.getKv<boolean>('seeded');
-  if (seeded) return;
-  const existing = await store.getItems();
-  if (existing.length === 0) for (const it of seedItems()) await store.putItem(it);
-  await store.setKv('seeded', true);
+const DEMO_IDS = new Set<string>(DEMO_ITEM_IDS);
+
+/** 舊版寫進裝置裡的示範資料：id 或網址對上才算，不看名稱 */
+export function isKnownDemoItem(item: Pick<Item, 'id' | 'url'>): boolean {
+  if (DEMO_IDS.has(item.id)) return true;
+  return DEMO_ITEM_URLS.some((u) => sameUrl(u, item.url));
+}
+
+/** 開啟時刪掉已知示範資料。使用者自己加的收藏留在原處，之後也不會再寫入範例。 */
+export async function removeStoredDemoItems(store: Store): Promise<void> {
+  const items = await store.getItems();
+  for (const it of items) {
+    if (isKnownDemoItem(it)) await store.deleteItem(it.id);
+  }
 }
 
 export async function loadSettings(store: Store): Promise<Settings> {

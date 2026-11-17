@@ -31,7 +31,9 @@ function serviceWorkerPlugin(): Plugin {
         hash.update(f);
         hash.update(b.type === 'chunk' ? b.code : typeof b.source === 'string' ? b.source : Buffer.from(b.source));
       }
-      const version = hash.digest('hex').slice(0, 12);
+      // 代次要手動加。內容雜湊會跟著檔案變，但已安裝的 PWA 需換掉快取名稱才會拿到新殼層。
+      const SW_CACHE_GENERATION = 2;
+      const version = SW_CACHE_GENERATION + '-' + hash.digest('hex').slice(0, 12);
       const precache = ['./', ...files.map((f) => './' + f)];
       const source = `/* George 的 興趣收藏 — Service Worker（build 時自動產生，請勿手改） */
 const CACHE = 'gic-shell-${version}';
@@ -51,9 +53,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  let url;
+  try { url = new URL(req.url); } catch { return; }
+  // 跨網域（oEmbed、Instagram、X、Threads、代理）一律不攔截、不快取。
+  // 不要在 Service Worker 裡重送這些請求：iOS Safari 會把跨網域 301 的 CORS 讀取弄失敗。
+  if (url.origin !== self.location.origin) return;
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // 社群網站、oEmbed、代理：不攔截、不快取
 
   if (req.mode === 'navigate') {
     // 殼層優先：有快取就立即開啟（離線可用），同時在背景更新 index.html

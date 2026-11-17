@@ -36,9 +36,8 @@ export function makeItem(p: Partial<Item> & Pick<Item, 'id' | 'name'>): Item {
   };
 }
 
-/** 預先放入指定收藏（並標記已寫過示範資料，避免干擾） */
+/** 預先放入指定收藏 */
 export async function preload(store: Store, items: Item[]) {
-  await store.setKv('seeded', true);
   for (const it of items) await store.putItem(it);
 }
 

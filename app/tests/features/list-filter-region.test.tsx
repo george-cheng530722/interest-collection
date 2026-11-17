@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { CITIES, seedItems } from '../../src/lib/constants';
-import { makeDevice, renderApp, screen, within } from '../helpers';
+import { CITIES } from '../../src/lib/constants';
+import { makeDevice, makeItem, preload, renderApp, screen, within } from '../helpers';
+import type { Item } from '../../src/lib/types';
 
-// 背景：清單中已有多則不同來源、分類與地區的收藏（首次開啟寫入的示範資料）
+const FIXTURE: Item[] = [
+  makeItem({ id: 'a', name: '師大雞排', source: 'Instagram', url: 'https://www.instagram.com/eats/p/AAA111/', handle: 'eats', category: '吃', city: '台北市', memo: '下次路過' }),
+  makeItem({ id: 'b', name: '河岸咖啡', source: 'Instagram', url: 'https://www.instagram.com/coffee/p/BBB222/', handle: 'coffee', category: '喝', city: '台北市' }),
+  makeItem({ id: 'c', name: '北部週末', source: 'Threads', url: 'https://www.threads.net/@weekend.north/post/WalkReal/', handle: 'weekend.north', category: '玩', city: '新北市', memo: '等天氣好再排' }),
+  makeItem({ id: 'd', name: '街角貓', source: 'X', url: 'https://x.com/streetcats/status/1001', handle: 'streetcats', category: '有趣', city: '台北市' }),
+  makeItem({ id: 'e', name: '空間筆記', source: 'Threads', url: 'https://www.threads.net/@studio.table/post/FlowReal/', handle: 'studio.table', category: '想 follow 學習', city: '其他', memo: '想看案例' }),
+  makeItem({ id: 'f', name: '南部食記', source: 'Instagram', url: 'https://www.instagram.com/south/p/CCC333/', handle: 'south', category: '吃', city: '台南市', status: '已完成', rating: 5, review: '好吃' }),
+  makeItem({ id: 'g', name: '逢甲香腸', source: 'X', url: 'https://x.com/foodnotes/status/1002', handle: 'foodnotes', category: '吃', city: '台中市' }),
+];
+
 async function setup() {
   const store = await makeDevice().open();
+  await preload(store, FIXTURE);
   return renderApp({ store });
 }
 const cards = () => screen.queryAllByTestId('item-card');
-const seed = seedItems();
-const namesOf = (pred: (i: (typeof seed)[number]) => boolean) => seed.filter(pred).map((i) => i.name).sort();
+const namesOf = (pred: (i: Item) => boolean) => FIXTURE.filter(pred).map((i) => i.name).sort();
 const visibleNames = () => screen.queryAllByTestId('item-name').map((e) => e.textContent!).sort();
 
 describe('功能: 清單、篩選與地區', () => {
@@ -66,7 +76,7 @@ describe('功能: 清單、篩選與地區', () => {
     expect(screen.getByText('@weekend.north')).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: '地區' })).getByRole('button', { name: '新北市' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('group', { name: '分類' })).getByRole('button', { name: '玩' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('detail-url')).toHaveAttribute('href', 'https://www.threads.net/@weekend.north/post/DemoJiufenWalk/');
+    expect(screen.getByTestId('detail-url')).toHaveAttribute('href', 'https://www.threads.net/@weekend.north/post/WalkReal/');
     expect(screen.getByLabelText('備註')).toHaveValue('等天氣好再排');
   });
 });

@@ -86,7 +86,7 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟�
   it('情境: 無法判斷地區時預設為其他', async () => {
     const { store } = await fresh();
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).startsWith('https://publish.twitter.com/')) {
+      if (String(input).startsWith('https://publish.x.com/')) {
         return new Response(JSON.stringify({ author_name: 'jack', author_url: 'https://x.com/jack', html: '<blockquote><p>just setting up my twttr</p></blockquote>' }), { status: 200 });
       }
       throw new TypeError('Failed to fetch');

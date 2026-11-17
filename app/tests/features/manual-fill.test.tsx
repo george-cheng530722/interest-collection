@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { PRIVATE_SAMPLE_URL } from '../../src/lib/constants';
 import { IG_URL, dialog, makeDevice, pasteAndAdd, preload, renderApp, screen, within } from '../helpers';
 
 const PRIVATE_URL = 'https://www.instagram.com/hidden.taipei.eats/p/PrivateNightMarket/';
@@ -83,16 +82,5 @@ describe('功能: 讀不到貼文時手動補充', () => {
     const [saved] = await store.getItems();
     expect(saved.screenshot).toMatch(/^data:image\//);
     expect(saved.memo).toBe('朋友私訊分享');
-  });
-
-  it('情境: 可用範例走一次私人貼文流程', async () => {
-    const store = await fresh();
-    const { user } = await renderApp({ store });
-    await user.click(screen.getByRole('button', { name: '填入私人貼文範例' }));
-    expect(screen.getByLabelText('貼上社群來源的連結')).toHaveValue(PRIVATE_SAMPLE_URL);
-    await user.click(screen.getByRole('button', { name: '加入' }));
-    const dlg = await dialog('讀取失敗，請手動補充');
-    expect(within(dlg).getByLabelText('連結')).toHaveValue(PRIVATE_SAMPLE_URL);
-    expect(within(dlg).getByLabelText(/^帳號/)).toHaveValue('secret.night.table');
   });
 });

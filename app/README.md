@@ -49,7 +49,7 @@ Playwright 使用 `channel: 'chrome'`（系統已安裝的 Google Chrome），�
 ## 技術選擇與理由
 
 - **Vite + TypeScript + React 19**：雛形本身是 React/TSX，畫面與狀態可以幾乎一對一搬過來；Vite 打包快、輸出純靜態檔，沒有伺服器執行期。
-- **手寫 Service Worker（build 時由 `vite.config.ts` 的小外掛產生 `dist/sw.js`）**：而不是 Workbox / vite-plugin-pwa。需求很單純（預先快取殼層、離線開啟），手寫約 50 行、零相依、行為一目了然。快取名稱帶內容雜湊，新版上線自動清舊快取；只攔截同源 GET，不碰 Instagram／X／Threads／代理的請求。
+- **手寫 Service Worker（build 時由 `vite.config.ts` 的小外掛產生 `dist/sw.js`）**：而不是 Workbox / vite-plugin-pwa。需求很單純（預先快取殼層、離線開啟），手寫約 50 行、零相依、行為一目了然。快取名稱是代次加內容雜湊（這次把代次加到 2），新版上線會清掉舊的 `gic-shell-` 快取，已安裝的 PWA 才會換到新殼層；只攔截同源 GET，跨網域的 oEmbed、Instagram、X、Threads 與代理一律不攔截、不快取。
 - **IndexedDB（自己包一層，無套件）→ localStorage → 記憶體** 三段降級（`src/lib/storage.ts`）。截圖縮成最長邊 640px 的 JPEG data URL 再存，避免撐爆容量；寫入遇到 `QuotaExceededError` 會在畫面顯示「儲存空間不足」，不會丟掉既有資料。啟動時呼叫 `navigator.storage.persist()` 請求持久儲存。
 - **vite-plugin-singlefile**：產出單一 HTML（CSS/JS 內嵌），方便拷到 iPhone「檔案」App。
 - **Vitest + Testing Library + fake-indexeddb**：在 jsdom 跑 BDD 情境；**Playwright**：在真的 Chrome 驗證 Service Worker 離線殼層與 file:// 單檔。
@@ -74,7 +74,7 @@ app/
 │     ├─ fetchMeta.ts         # 抓取流程：直接 fetch → 公開 oEmbed → 代理（僅開啟時）
 │     ├─ og.ts                # og 標籤解析與各平台標題整理
 │     ├─ share.ts             # LINE 分享網址、分享文字、匯出文字／CSV、複製、下載
-│     ├─ storage.ts           # IndexedDB / localStorage / 記憶體、示範資料只寫一次、設定
+│     ├─ storage.ts           # IndexedDB / localStorage / 記憶體、清掉舊版示範資料、設定
 │     ├─ thumbs.ts            # 縮圖過期判斷與真的重新抓取
 │     └─ image.ts             # 截圖縮小
 ├─ proxy/server.mjs           # 可選中繼資料代理（外掛，零相依，預設不用）
@@ -120,19 +120,19 @@ App 支援 `?url=` 或 `?text=` 參數：開啟時會自動把內容帶進加入
 
 ## 資料與功能說明
 
-- 首次開啟會寫入 8 則示範資料（標示「示範資料」），同時記下旗標；之後即使全部刪掉，**也不會再寫回**（和雛形的「重整恢復範例」不同）。
+- 全新開啟是空的，畫面上會請你貼上 Instagram、X 或 Threads 的連結。舊版寫進這台裝置的示範資料（已知 id 或網址，例如河岸散策、隱藏台北小吃）會在開啟時刪掉；你自己加的收藏會留下，之後也不會再寫入範例。
 - 地區必填，無法判斷時預設「其他」；確認畫面與手動補充都可取消選取，取消後「加入」按鈕會停用。
 - 分享到 LINE 用官方網址 `https://line.me/R/share?text=…`（文字含名稱、地區、連結；單則另附 `https://social-plugins.line.me/lineit/share?url=…` 只分享連結）。也可複製或用系統分享。
 - 匯出：目前畫面或全部收藏；純文字或 CSV（欄位：清單、名稱、地區、連結；CSV 加 UTF-8 BOM）；可複製或下載。
 - 縮圖過期：Instagram CDN 網址的 `oe=` 參數是到期時間，到期或圖片載入失敗時會**自動**重新抓取（直接 → oEmbed → 代理[若開啟]），顯示「縮圖已過期 → 正在更新… → 已更新」；失敗時保留既有縮圖網址或改顯示分類圖示，標記「更新失敗」，收藏本身不受影響，6 小時後下次開啟再試。
-- 連結失效：X 的公開 oEmbed 回 404、Threads oEmbed 回 400/404、或直接抓到 404/410 時判定失效，詢問「先保留（留下『連結失效』標記）／刪除（再確認一次）」。詳情頁的「檢查連結與更新縮圖」會真的去檢查；「模擬縮圖過期」「模擬連結失效」是明顯標示的示範按鈕，觸發的是同一套真實流程。
+- 連結失效：X 的公開 oEmbed 回 404、Threads oEmbed 回 400/404、或直接抓到 404/410 時判定失效，詢問「先保留（留下『連結失效』標記）／刪除（再確認一次）」。詳情頁的「檢查連結與更新縮圖」會真的去檢查。縮圖過期仍會自動重抓，不需要另外的示範按鈕。
 
 ## iOS Safari 實際行為
 
 以下依實作與已知平台限制整理，**不是保證**；實際行為會隨 iOS 版本改變。抓取結果是 2026-11-17 在 Linux 上用 Node 與 Playwright + Google Chrome 156 實測（詳見 `/tmp/interest-app-link-fetch.txt`），**沒有在真的 iPhone 上測過**；Safari 的 CORS 規則與 Chrome 相同，預期結果一致，但仍需真機確認。
 
 - **Instagram／Threads 貼文頁直接 fetch：被 CORS 擋下**（沒有 `Access-Control-Allow-Origin`）。**X 貼文頁**在瀏覽器裡回 403、內容是空的。所以「直接讀 og 標籤」在手機上幾乎一定失敗，**無伺服器時的正式路徑是預填後的手動補充表單**（預填連結、來源、從網址解析的帳號）。
-- 據實記錄的例外：**X 的公開 oEmbed（`publish.twitter.com/oembed`）可以從瀏覽器讀到**（會回傳對應 Origin 的 CORS 標頭），能拿到作者與推文文字，但沒有縮圖；App 會用它帶到「確認地區後加入」畫面。**Threads 的 `graph.threads.net/v1.0/oembed` 也可從瀏覽器讀到（`ACAO: *`）**，但只回傳嵌入用 HTML，沒有作者、標題、縮圖，只能用來確認貼文存在／失效，所以 Threads 仍走手動補充。Instagram 的舊 oEmbed 端點被 CORS 擋、新版需要 Meta access token，前端不能用。這些端點隨時可能改變。
+- 據實記錄的例外：**X 的公開 oEmbed 要打 `publish.x.com/oembed`**。`publish.twitter.com/oembed` 現在 301 到 `publish.x.com`；兩個回應都帶這個網站的 `Access-Control-Allow-Origin`，但 iOS Safari 對這種跨網域 CORS 重新導向會失敗（本機 Chrome 會跟著走完，所以單元測試以前看不出來）。App 先打 `publish.x.com`，連不上才退回 `publish.twitter.com`。從 X iOS App 分享的網址（`?s=46&t=…`、`twitter.com`、`mobile.twitter.com`、`/i/web/status/`）會先整理成 `https://x.com/…/status/{id}` 或 `https://x.com/i/status/{id}` 再問 oEmbed（`/i/web/status/` 直接問會 404）。能拿到作者與推文文字，但沒有縮圖；App 會用它帶到「確認地區後加入」畫面。**Threads 的 `graph.threads.net/v1.0/oembed` 也可從瀏覽器讀到（`ACAO: *`）**，但只回傳嵌入用 HTML，沒有作者、標題、縮圖，只能用來確認貼文存在／失效，所以 Threads 仍走手動補充。Instagram 的舊 oEmbed 端點被 CORS 擋、新版需要 Meta access token，前端不能用。這些端點隨時可能改變。Service Worker 不攔截、不快取這些跨網域請求。
 - 伺服器端（curl／Node）三個網址都是 HTTP 200 且有 og:title／og:description／og:image（Threads 會 301 轉到 threads.com）——這就是可選代理能補強的部分。
 - **PWA「加到主畫面」第一次必須從 https 載入**；Service Worker 不能在 `file://` 註冊（只有 https 或 localhost）。
 - **從「檔案」打開單檔 HTML**：通常可以操作介面；不能當成完整離線 PWA（沒有 Service Worker、通常也不能加到主畫面成為獨立 App）；Safari 對 `file://` 的 localStorage／IndexedDB 行為不穩定（可能無法使用、可能和其他檔案共用、可能被清掉）。App 會自動降級並在畫面顯示警告。

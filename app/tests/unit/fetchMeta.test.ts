@@ -29,18 +29,37 @@ describe('抓取流程：直接 → 公開 oEmbed → 代理（只在開啟時�
     expect(r).toMatchObject({ ok: false, reason: 'cors' });
     expect(urls(f)).toEqual([IG]); // Instagram 沒有免金鑰的 oEmbed
   });
-  it('X：直接被擋，改讀公開 oEmbed 成功', async () => {
+  it('X：直接被擋，改讀 publish.x.com oEmbed，並用整理過的網址', async () => {
+    const shared = 'https://x.com/i/web/status/20?s=46&t=abc';
     const f = vi.fn(async (u: RequestInfo | URL) => {
-      if (String(u).startsWith('https://publish.twitter.com/oembed')) return new Response(JSON.stringify({ author_name: 'jack', author_url: 'https://x.com/jack', html: '<blockquote><p>just setting up my twttr</p></blockquote>' }));
+      const s = String(u);
+      if (s.startsWith('https://publish.x.com/oembed')) {
+        expect(s).toContain(encodeURIComponent('https://x.com/i/status/20'));
+        expect(s).not.toContain('s%3D46');
+        return new Response(JSON.stringify({ author_name: 'jack', author_url: 'https://x.com/jack', html: '<blockquote><p>just setting up my twttr</p></blockquote>' }));
+      }
       return new Response('', { status: 403 });
     });
-    const r = await fetchPostMeta(X, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
+    const r = await fetchPostMeta(shared, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
     expect(r).toMatchObject({ ok: true, via: 'oembed', meta: { name: 'jack', handle: 'jack', caption: 'just setting up my twttr' } });
-    expect(urls(f)[0]).toBe(X);
+    expect(urls(f)[0]).toBe('https://x.com/i/status/20');
+    expect(urls(f).some((u) => u.includes('publish.twitter.com'))).toBe(false);
   });
-  it('X oEmbed 404 → 判定連結失效', async () => {
-    const f = vi.fn(async (u: RequestInfo | URL) => { if (String(u).includes('publish.twitter.com')) return new Response('', { status: 404 }); throw new TypeError('x'); });
+  it('publish.x.com 連不上時才改打 publish.twitter.com', async () => {
+    const f = vi.fn(async (u: RequestInfo | URL) => {
+      const s = String(u);
+      if (s.startsWith('https://publish.x.com/oembed')) throw new TypeError('Load failed');
+      if (s.startsWith('https://publish.twitter.com/oembed')) return new Response(JSON.stringify({ author_name: 'jack', author_url: 'https://x.com/jack', html: '<blockquote><p>just setting up my twttr</p></blockquote>' }));
+      throw new TypeError('x');
+    });
+    const r = await fetchPostMeta('https://twitter.com/jack/status/20?s=46', { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
+    expect(r).toMatchObject({ ok: true, via: 'oembed', meta: { name: 'jack', caption: 'just setting up my twttr' } });
+    expect(urls(f).filter((u) => u.includes('/oembed'))).toHaveLength(2);
+  });
+  it('X oEmbed 404 → 判定連結失效，不再打備援', async () => {
+    const f = vi.fn(async (u: RequestInfo | URL) => { if (String(u).includes('publish.x.com')) return new Response('', { status: 404 }); throw new TypeError('x'); });
     expect(await fetchPostMeta(X, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true })).toMatchObject({ ok: false, reason: 'dead' });
+    expect(urls(f).some((u) => u.includes('publish.twitter.com'))).toBe(false);
   });
   it('Threads oEmbed 只能確認存在、沒有內容 → 改手動補充（不是失效）', async () => {
     const f = vi.fn(async (u: RequestInfo | URL) => { if (String(u).includes('graph.threads.net')) return new Response(JSON.stringify({ type: 'rich', html: '<blockquote></blockquote>', provider_name: 'Threads' })); throw new TypeError('x'); });

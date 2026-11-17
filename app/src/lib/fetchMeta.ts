@@ -1,6 +1,6 @@
 import type { Settings, Source } from './types';
 import { extractOg, looksLikeLoginWall, normalizeOg, textFromXEmbedHtml, type PostMeta, type RawOg } from './og';
-import { parseUrlMeta } from './parse';
+import { normalizeUrl, parseUrlMeta } from './parse';
 
 export type FailReason = 'cors' | 'network' | 'offline' | 'private' | 'dead' | 'empty';
 
@@ -17,11 +17,23 @@ export interface FetchDeps {
   timeoutMs?: number;
 }
 
-/** 公開、不需金鑰、實測（2026-11-17，Chrome）可從瀏覽器直接讀取的 oEmbed 端點 */
+/**
+ * 公開、不需金鑰的 oEmbed 端點。
+ * X 先打 publish.x.com：publish.twitter.com 現在 301 到 publish.x.com，
+ * iOS Safari 對這個跨網域 CORS 重新導向會直接失敗（本機 Chrome 測試會跟著走完，所以以前看不出來）。
+ * publish.twitter.com 只在 publish.x.com 連不上時才當備援。404／410 視為貼文失效，不再改打備援。
+ */
+export function oembedUrls(source: Source, url: string): string[] {
+  if (source === 'X') {
+    const q = 'omit_script=1&dnt=1&url=' + encodeURIComponent(normalizeUrl(url));
+    return ['https://publish.x.com/oembed?' + q, 'https://publish.twitter.com/oembed?' + q];
+  }
+  if (source === 'Threads') return ['https://graph.threads.net/v1.0/oembed?url=' + encodeURIComponent(url)];
+  return []; // Instagram oEmbed 需要 Meta 的 access token，前端無法使用
+}
+
 export function oembedUrl(source: Source, url: string): string | null {
-  if (source === 'X') return 'https://publish.twitter.com/oembed?omit_script=1&dnt=1&url=' + encodeURIComponent(url);
-  if (source === 'Threads') return 'https://graph.threads.net/v1.0/oembed?url=' + encodeURIComponent(url);
-  return null; // Instagram oEmbed 需要 Meta 的 access token，前端無法使用
+  return oembedUrls(source, url)[0] ?? null;
 }
 
 export function proxyEndpoint(settings: Settings, url: string): string {
@@ -41,7 +53,7 @@ const isDeadStatus = (s: number) => s === 404 || s === 410;
 /**
  * 取得貼文資訊。順序：
  *   1. 裝置直接 fetch 貼文網址，讀 og 標籤（IG／Threads／X 幾乎都會被 CORS 擋）
- *   2. 公開 oEmbed（X：publish.twitter.com；Threads：graph.threads.net，只能確認存在）
+ *   2. 公開 oEmbed（X：publish.x.com，失敗再 publish.twitter.com；Threads：graph.threads.net，只能確認存在）
  *   3. 只有在設定中「開啟」中繼資料代理時，才請求代理
  * 全部失敗就回傳失敗原因，由畫面改開手動補充表單。
  */
@@ -60,17 +72,18 @@ export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaR
   let reason: FailReason = 'empty';
   let corsBlocked = false;
   let exists = false;
+  const canonical = source === 'X' ? normalizeUrl(url) : url;
 
   // 1. 直接抓
   try {
-    const r = await timed(fetchImpl, url, timeoutMs);
+    const r = await timed(fetchImpl, canonical, timeoutMs);
     if (isDeadStatus(r.status)) {
-      attempts.push({ via: 'direct', target: url, outcome: `HTTP ${r.status}` });
+      attempts.push({ via: 'direct', target: canonical, outcome: `HTTP ${r.status}` });
       reason = 'dead';
     } else if (r.ok) {
       const html = await r.text();
       const og = extractOg(html);
-      attempts.push({ via: 'direct', target: url, outcome: `HTTP ${r.status}` });
+      attempts.push({ via: 'direct', target: canonical, outcome: `HTTP ${r.status}` });
       if (looksLikeLoginWall(og)) reason = 'private';
       else {
         const meta = normalizeOg(source, og, handle);
@@ -78,16 +91,15 @@ export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaR
       }
     } else {
       // 401／403 多半是平台擋機器人（例如 x.com），不代表私人貼文
-      attempts.push({ via: 'direct', target: url, outcome: `HTTP ${r.status}` });
+      attempts.push({ via: 'direct', target: canonical, outcome: `HTTP ${r.status}` });
     }
   } catch (e) {
     corsBlocked = true;
-    attempts.push({ via: 'direct', target: url, outcome: `被擋下（CORS 或網路）：${(e as Error)?.name || 'Error'}` });
+    attempts.push({ via: 'direct', target: canonical, outcome: `被擋下（CORS 或網路）：${(e as Error)?.name || 'Error'}` });
   }
 
-  // 2. 公開 oEmbed
-  const oe = oembedUrl(source, url);
-  if (oe) {
+  // 2. 公開 oEmbed（X 有備援端點；404 不再往下打）
+  for (const oe of oembedUrls(source, canonical)) {
     try {
       const r = await timed(fetchImpl, oe, timeoutMs);
       attempts.push({ via: 'oembed', target: oe, outcome: `HTTP ${r.status}` });
@@ -99,8 +111,11 @@ export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaR
         if (j.author_name || text) {
           return { ok: true, via: 'oembed', attempts, meta: { name: j.author_name || handle, caption: text, handle: handle || authorHandle, image: j.thumbnail_url } };
         }
-      } else if (isDeadStatus(r.status) || (source === 'Threads' && r.status === 400)) {
+        break;
+      }
+      if (isDeadStatus(r.status) || (source === 'Threads' && r.status === 400)) {
         reason = 'dead';
+        break;
       }
     } catch (e) {
       attempts.push({ via: 'oembed', target: oe, outcome: `被擋下（CORS 或網路）：${(e as Error)?.name || 'Error'}` });
@@ -109,7 +124,7 @@ export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaR
 
   // 3. 可選代理（預設關閉；關閉時絕不送出）
   if (deps.settings.proxyEnabled && deps.settings.proxyUrl) {
-    const target = proxyEndpoint(deps.settings, url);
+    const target = proxyEndpoint(deps.settings, canonical);
     try {
       const r = await timed(fetchImpl, target, timeoutMs + 4000);
       attempts.push({ via: 'proxy', target, outcome: `HTTP ${r.status}` });

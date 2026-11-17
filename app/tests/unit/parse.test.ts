@@ -34,6 +34,16 @@ describe('從 LINE 分享文字找出貼文網址', () => {
     expect(sameUrl('https://www.instagram.com/p/A/?igsh=1', 'https://instagram.com/p/A')).toBe(true);
     expect(normalizeUrl('https://x.com/a/status/1#frag')).toBe('https://x.com/a/status/1');
   });
+  it('X iOS 分享網址：去掉查詢參數，並整理主機與 /i/web/status/', () => {
+    expect(normalizeUrl('https://x.com/jack/status/20?s=46&t=AbCd')).toBe('https://x.com/jack/status/20');
+    expect(normalizeUrl('https://twitter.com/jack/status/20')).toBe('https://x.com/jack/status/20');
+    expect(normalizeUrl('https://mobile.twitter.com/jack/status/20?s=21')).toBe('https://x.com/jack/status/20');
+    expect(normalizeUrl('https://www.x.com/jack/status/20/')).toBe('https://x.com/jack/status/20');
+    expect(normalizeUrl('https://m.twitter.com/jack/status/20?s=46')).toBe('https://x.com/jack/status/20');
+    expect(normalizeUrl('https://x.com/i/web/status/20?s=46&t=zzz')).toBe('https://x.com/i/status/20');
+    expect(normalizeUrl('https://twitter.com/i/web/status/20')).toBe('https://x.com/i/status/20');
+    expect(extractPostUrl('從 X 分享 https://x.com/jack/status/20?s=46&t=zzzz')).toBe('https://x.com/jack/status/20');
+  });
 });
 
 describe('分類、地區、私人判斷、縮圖到期', () => {

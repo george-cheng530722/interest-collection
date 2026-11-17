@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
-import { ensureSeeded, idbStore, loadSettings, localStore, memoryStore, openIdb, saveSettings, StorageFullError } from '../../src/lib/storage';
-import { seedItems } from '../../src/lib/constants';
+import { idbStore, isKnownDemoItem, loadSettings, localStore, memoryStore, openIdb, removeStoredDemoItems, saveSettings, StorageFullError } from '../../src/lib/storage';
 import { makeItem } from '../helpers';
 
 describe('本機儲存', () => {
@@ -13,15 +12,20 @@ describe('本機儲存', () => {
     expect((await s2.getItems()).map((i) => i.name)).toEqual(['測試店']);
   });
 
-  it('示範資料只寫一次：刪光後重開不會被寫回', async () => {
+  it('全新儲存是空的，載入時只刪已知示範 id 或網址', async () => {
     const f = new IDBFactory();
     const s = idbStore(await openIdb(f));
-    await ensureSeeded(s);
-    expect(await s.getItems()).toHaveLength(seedItems().length);
-    for (const it of await s.getItems()) await s.deleteItem(it.id);
-    const again = idbStore(await openIdb(f));
-    await ensureSeeded(again);
-    expect(await again.getItems()).toHaveLength(0);
+    await removeStoredDemoItems(s);
+    expect(await s.getItems()).toHaveLength(0);
+
+    await s.putItem(makeItem({ id: 'demo-2', name: '改過的名字', url: 'https://www.instagram.com/mine/p/NOTDEMO/' }));
+    await s.putItem(makeItem({ id: 'custom', name: '隱藏台北小吃', url: 'https://www.instagram.com/hidden.taipei.eats/p/PrivateNightMarket/' }));
+    await s.putItem(makeItem({ id: 'mine', name: '河岸散策', url: 'https://www.instagram.com/coffee/p/MINE/' }));
+    await removeStoredDemoItems(s);
+    expect((await s.getItems()).map((i) => i.id)).toEqual(['mine']);
+    expect(isKnownDemoItem({ id: 'demo-8', url: 'https://example.com/x' })).toBe(true);
+    expect(isKnownDemoItem({ id: 'mine', url: 'https://www.instagram.com/p/DemoRiverCoffee' })).toBe(true);
+    expect(isKnownDemoItem({ id: 'mine', url: 'https://www.instagram.com/coffee/p/MINE/' })).toBe(false);
   });
 
   it('localStorage 降級：序列化與重開', async () => {

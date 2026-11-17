@@ -12,8 +12,6 @@ export interface DetailActions {
   moveBack: () => void;
   askDelete: () => void;
   checkLink: () => void;
-  simulateThumbExpired: () => void;
-  simulateDeadLink: () => void;
   thumbBroken: () => void;
 }
 
@@ -34,7 +32,6 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
       <header className="topbar">
         <Btn label="返回" onClick={actions.back} />
         <h1 className="topbar-title">貼文詳情</h1>
-        {item.demo ? <Tag>示範資料</Tag> : <span />}
       </header>
       <main className="scroll pad">
         <div className="center-col">
@@ -92,10 +89,6 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
 
         <div className="col actions">
           <Btn label={checking ? '檢查中…' : '檢查連結與更新縮圖'} onClick={actions.checkLink} disabled={checking} block />
-          <div className="demo-box">
-            <div className="muted small">示範用（模擬）：重現過期與失效流程。縮圖自動更新與失效詢問的邏輯是真的。</div>
-            <div className="row"><Btn label="模擬縮圖過期" onClick={actions.simulateThumbExpired} block /><Btn label="模擬連結失效" onClick={actions.simulateDeadLink} block /></div>
-          </div>
           <Btn label="刪除這則收藏" onClick={actions.askDelete} danger block />
         </div>
       </main>

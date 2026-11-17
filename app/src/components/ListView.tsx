@@ -20,7 +20,7 @@ function dateLabel(t: number): string {
 export function ListView(props: {
   items: Item[]; visible: Item[]; filters: Filters; setFilters: (f: Filters) => void;
   input: string; setInput: (s: string) => void; loading: boolean; notice: string; online: boolean; storageWarning: string;
-  onAdd: () => void; onFillDemo: () => void; onFillPrivate: () => void; onShareList: () => void; onExport: () => void; onSettings: () => void;
+  onAdd: () => void; onShareList: () => void; onExport: () => void; onSettings: () => void;
   onOpen: (id: string) => void; onShareItem: (it: Item) => void; onThumbBroken: (id: string) => void;
 }) {
   const { items, visible, filters: f, setFilters } = props;
@@ -40,8 +40,7 @@ export function ListView(props: {
           <label htmlFor="add-input" className="field-label">貼上社群來源的連結</label>
           <textarea id="add-input" rows={2} value={props.input} onChange={(e) => props.setInput(e.target.value)} placeholder="貼上 Instagram、X 跟 Threads 的連結，或 LINE 分享的文字" autoCapitalize="off" autoCorrect="off" />
         </div>
-        <div className="row"><Btn label="填入範例" onClick={props.onFillDemo} disabled={props.loading} block /><Btn type="submit" label={props.loading ? '讀取中…' : '加入'} primary disabled={props.loading} block /></div>
-        <Btn label="填入私人貼文範例" onClick={props.onFillPrivate} disabled={props.loading} block />
+        <div className="row"><Btn type="submit" label={props.loading ? '讀取中…' : '加入'} primary disabled={props.loading} block /></div>
         <div className="row"><Btn label="分享清單" onClick={props.onShareList} disabled={visible.length === 0} block /><Btn label="匯出" onClick={props.onExport} disabled={visible.length === 0} block /></div>
         {props.notice ? <div className="notice-text" role="status">{props.notice}</div> : null}
       </form>
@@ -63,7 +62,11 @@ export function ListView(props: {
       </div>
       <main className="scroll pad-x" aria-label="收藏清單">
         {props.loading ? <div className="card muted" role="status">正在讀取貼文資訊…</div> : null}
-        {visible.length === 0 && !props.loading ? <div className="empty">{inTab.length === 0 ? '這個區塊還沒有項目' : '這個篩選沒有項目'}</div> : null}
+        {visible.length === 0 && !props.loading ? (
+          items.length === 0
+            ? <div className="empty" data-testid="empty-state"><p className="empty-title">還沒有收藏</p><p>貼上 Instagram、X 或 Threads 的連結，就能開始收集。</p></div>
+            : <div className="empty">{inTab.length === 0 ? '這個區塊還沒有項目' : '這個篩選沒有項目'}</div>
+        ) : null}
         <ul className="list">
           {visible.map((it) => (
             <li key={it.id}>

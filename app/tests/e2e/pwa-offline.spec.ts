@@ -35,6 +35,7 @@ test('情境: 加到主畫面後離線仍能開啟與編輯（真的 Service Wor
   await page.reload(); // 讓頁面由 Service Worker 控制
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await manualAdd(page, 'https://www.instagram.com/private.shop/p/PrivateE2E/', '測試店');
+  await manualAdd(page, 'https://www.instagram.com/private.shop/p/ToDeleteE2E/', '要刪的');
 
   await context.setOffline(true);
   await page.reload();
@@ -55,10 +56,10 @@ test('情境: 加到主畫面後離線仍能開啟與編輯（真的 Service Wor
   await page.getByRole('button', { name: '返回' }).click();
   // 離線刪除
   await page.getByRole('button', { name: /^想體驗/ }).click();
-  await page.getByRole('button', { name: '北部週末' }).click();
+  await page.getByRole('button', { name: '要刪的' }).click();
   await page.getByRole('button', { name: '刪除這則收藏' }).click();
   await page.getByRole('dialog', { name: '刪除這則收藏？' }).getByRole('button', { name: '確定刪除' }).click();
-  await expect(page.getByRole('button', { name: '北部週末' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '要刪的' })).toHaveCount(0);
   // 離線手動新增（公開網址也因離線改走手動補充）
   await page.getByLabel('貼上社群來源的連結').fill('https://x.com/jack/status/20');
   await page.getByRole('button', { name: '加入', exact: true }).click();
@@ -72,7 +73,7 @@ test('情境: 加到主畫面後離線仍能開啟與編輯（真的 Service Wor
   // 仍離線，再重開一次
   await page.reload();
   await expect(page.getByRole('button', { name: '離線新增' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '北部週末' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '要刪的' })).toHaveCount(0);
   await page.getByRole('button', { name: /^已完成/ }).click();
   await page.getByRole('button', { name: '測試店' }).click();
   await expect(page.getByLabel('備註')).toHaveValue('離線時寫的');
@@ -80,20 +81,16 @@ test('情境: 加到主畫面後離線仍能開啟與編輯（真的 Service Wor
   await context.setOffline(false);
 });
 
-test('刪除與示範資料：重整後刪除仍有效，示範資料不會寫回', async ({ page }) => {
+test('初次開啟是空的；刪除後重整也不會寫回資料', async ({ page }) => {
   await page.goto('./');
-  const cards = page.getByTestId('item-card');
-  await expect(cards.first()).toBeVisible();
-  let n = await cards.count();
-  while (n > 0) {
-    await cards.first().click();
-    await page.getByRole('button', { name: '刪除這則收藏' }).click();
-    await page.getByRole('dialog', { name: '刪除這則收藏？' }).getByRole('button', { name: '確定刪除' }).click();
-    await expect(cards).toHaveCount(n - 1);
-    n -= 1;
-  }
+  await expect(page.getByTestId('empty-state')).toContainText('貼上 Instagram、X 或 Threads 的連結');
+  await manualAdd(page, 'https://www.instagram.com/private.shop/p/TempE2E/', '暫時收藏');
+  await page.getByRole('button', { name: '暫時收藏' }).click();
+  await page.getByRole('button', { name: '刪除這則收藏' }).click();
+  await page.getByRole('dialog', { name: '刪除這則收藏？' }).getByRole('button', { name: '確定刪除' }).click();
+  await expect(page.getByTestId('empty-state')).toBeVisible();
   await page.reload();
-  await expect(page.getByText('這個區塊還沒有項目')).toBeVisible();
+  await expect(page.getByTestId('empty-state')).toBeVisible();
 });
 
 test('真實網路：X 公開 oEmbed 可從瀏覽器讀到 → 確認畫面；Instagram 被 CORS 擋 → 手動補充', async ({ page }) => {

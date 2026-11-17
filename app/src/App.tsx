@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Item, Settings } from './lib/types';
 import { DEFAULT_SETTINGS } from './lib/types';
-import { DEFAULT_CITY, PRIVATE_SAMPLE_URL, PUBLIC_SAMPLE_URLS, defaultEmoji } from './lib/constants';
+import { DEFAULT_CITY, defaultEmoji } from './lib/constants';
 import { classify, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
 import { failMessage, fetchPostMeta, type FailReason } from './lib/fetchMeta';
 import { isThumbExpired, refreshThumb } from './lib/thumbs';
-import { ensureSeeded, loadSettings, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
+import { loadSettings, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
 import { shareItemText, shareListText } from './lib/share';
 import { applyFilters, ListView, type Filters } from './components/ListView';
 import { Detail } from './components/Detail';
@@ -63,7 +63,6 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState('');
-  const demoIdx = useRef(0);
   const attempted = useRef(new Set<string>());
   const sharedHandled = useRef(false);
 
@@ -78,7 +77,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     let alive = true;
     (async () => {
       try {
-        await ensureSeeded(store);
+        await removeStoredDemoItems(store);
         const [all, s] = await Promise.all([store.getItems(), loadSettings(store)]);
         const now = Date.now();
         // 上次中斷的更新、或很久以前失敗的縮圖，這次開啟時再自動試一次
@@ -172,7 +171,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
 
   const add = useCallback(async (raw?: string) => {
     const text = (raw ?? input).trim();
-    if (!text) { setNotice('請先貼上 Instagram、X 或 Threads 的連結，或按「填入範例」。'); return; }
+    if (!text) { setNotice('請先貼上 Instagram、X 或 Threads 的連結。'); return; }
     const url = extractPostUrl(text);
     if (!url) { setNotice('目前支援 Instagram、X 與 Threads 的貼文連結。'); return; }
     const dup = itemsRef.current.find((x) => sameUrl(x.url, url));
@@ -204,16 +203,6 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     setInput(initialShared);
     void add(initialShared);
   }, [loaded, initialShared, add]);
-
-  const fillDemo = () => {
-    const used = itemsRef.current;
-    const candidates = PUBLIC_SAMPLE_URLS.filter((u) => !used.some((x) => sameUrl(x.url, u)));
-    const list = candidates.length ? candidates : PUBLIC_SAMPLE_URLS;
-    setInput(list[demoIdx.current % list.length]);
-    demoIdx.current += 1;
-    setNotice('');
-  };
-  const fillPrivate = () => { setInput(PRIVATE_SAMPLE_URL); setNotice('這則是讀不到的私人貼文範例。按「加入」後會出現手動補充表單。'); };
 
   // ---- 衍生資料 ----
   const visible = useMemo(() => applyFilters(items, filters), [items, filters]);
@@ -266,8 +255,6 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
             moveBack: () => patchItem(openItem.id, { status: '想體驗' }),
             askDelete: () => setDeleteFor(openItem.id),
             checkLink: () => void checkLink(openItem),
-            simulateThumbExpired: () => { attempted.current.delete(openItem.id); patchItem(openItem.id, { thumbState: 'expired' }); },
-            simulateDeadLink: () => { patchItem(openItem.id, { linkDead: true }); setDeadFor(openItem.id); },
             thumbBroken: () => onThumbBroken(openItem.id),
           }}
         />
@@ -275,7 +262,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
         <ListView
           items={items} visible={visible} filters={filters} setFilters={setFilters}
           input={input} setInput={setInput} loading={loading} notice={notice} online={online} storageWarning={storageWarning}
-          onAdd={() => void add()} onFillDemo={fillDemo} onFillPrivate={fillPrivate}
+          onAdd={() => void add()}
           onShareList={() => setShare({ title: '分享清單給 LINE 好友', text: shareListText(listName, visible) })}
           onExport={() => setExportOpen(true)} onSettings={() => void openSettings()}
           onOpen={(id) => setOpenId(id)} onShareItem={(it) => setShare({ title: '分享給 LINE 好友', text: shareItemText(it), url: it.url })}

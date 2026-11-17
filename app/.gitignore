@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-single
+test-results
+playwright-report
+
+# Xcode 使用者檔與建置產物（ios/ 專案本體要保留）
+xcuserdata/
+*.xcuserstate
+ios/App/build/
+ios/DerivedData/
+.DS_Store

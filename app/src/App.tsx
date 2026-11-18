@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from './lib/types';
 import { DEFAULT_CITY, defaultEmoji } from './lib/constants';
 import { classify, duplicateGroups, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
 import { extractAddress, extractPlaceName, shortSummary } from './lib/place';
+import { commitPhone, extractPhone } from './lib/phone';
 import { geocodePlace } from './lib/geo';
 import { failMessage, fetchPostMeta, type FailReason } from './lib/fetchMeta';
 import { isThumbExpired, refreshThumb } from './lib/thumbs';
@@ -33,7 +34,7 @@ function blankItem(url: string, p: Partial<Item>): Item {
   const now = Date.now();
   const { source, handle } = parseUrlMeta(url);
   return {
-    id: newId(), source: source ?? 'Instagram', url, handle, name: '', placeName: '', caption: '', summary: '', address: '', category: '', city: DEFAULT_CITY,
+    id: newId(), source: source ?? 'Instagram', url, handle, name: '', placeName: '', caption: '', summary: '', address: '', phone: '', category: '', city: DEFAULT_CITY,
     status: '想體驗', memo: '', rating: 0, review: '', manual: false, linkDead: false, thumbState: 'ok',
     emoji: '✨', createdAt: now, updatedAt: now, fetchedVia: 'manual', ...p,
   };
@@ -225,7 +226,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
       const basis = `${m.name} ${caption}`;
       const category = classify(basis);
       setPending(blankItem(url, {
-        name: m.name, placeName: extractPlaceName(m.name, caption), caption, summary: shortSummary(caption), address: extractAddress(caption),
+        name: m.name, placeName: extractPlaceName(m.name, caption), caption, summary: shortSummary(caption), address: extractAddress(caption), phone: extractPhone(m.name, caption),
         handle: m.handle || parseUrlMeta(url).handle, category, city: inferCity(basis),
         emoji: defaultEmoji(category), thumbUrl: m.image, thumbExpiresAt: thumbExpiryFromUrl(m.image), fetchedVia: res.via,
       }));
@@ -350,7 +351,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
       {pending ? <ConfirmAddSheet draft={pending} onChange={(p) => setPending((d) => (d ? { ...d, ...p } : d))} onCancel={() => { dupBypass.current = null; setPending(null); }} onConfirm={() => {
         if (!pending.city || !pending.category) return;
         const save = () => {
-          insertItem({ ...pending, placeName: pending.placeName.trim(), summary: pending.summary || shortSummary(pending.caption), createdAt: Date.now(), updatedAt: Date.now() });
+          insertItem({ ...pending, placeName: pending.placeName.trim(), phone: commitPhone(pending.phone, pending.name, pending.caption), summary: pending.summary || shortSummary(pending.caption), createdAt: Date.now(), updatedAt: Date.now() });
           setPending(null);
         };
         if (askDuplicate(pending.url, save)) return;
@@ -362,7 +363,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
         if (!d.name.trim() || !d.handle.trim() || !d.category || !d.city) return;
         const save = () => {
           const caption = d.caption.trim();
-          insertItem({ ...d, name: d.name.trim(), placeName: d.placeName.trim(), address: d.address.trim(), caption, summary: shortSummary(caption), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
+          insertItem({ ...d, name: d.name.trim(), placeName: d.placeName.trim(), address: d.address.trim(), phone: commitPhone(d.phone, d.name, caption), caption, summary: shortSummary(caption), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
           setManual(null);
         };
         if (askDuplicate(d.url, save)) return;

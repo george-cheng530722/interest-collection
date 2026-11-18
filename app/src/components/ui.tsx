@@ -3,6 +3,7 @@ import type { Category, Item, Settings, Source } from '../lib/types';
 import { thumbLabel } from '../lib/thumbs';
 import { CITIES, isKnownCity } from '../lib/constants';
 import { distanceKm, formatDistance, mapsNavigateUrl, mapsSearchUrl } from '../lib/geo';
+import { telHref } from '../lib/phone';
 
 export type ChipTone = 'ig' | 'threads' | 'x' | 'line' | 'eat' | 'drink' | 'play' | 'fun' | 'learn' | 'collab' | 'idea' | 'life' | 'region';
 
@@ -52,22 +53,28 @@ export function BrandMark({ size = 48 }: { size?: number }) {
   );
 }
 
-/** 有店名或地址才出現。有座標才顯示距離與導航；編碼失敗只留名稱和搜尋連結，不顯示捏造的地址。 */
+/** 有店名或地址才出現導航。有電話就顯示撥打；沒有電話但有店名或地址時，給一個查電話的地圖搜尋。 */
 export function PlaceNav({ item, home }: { item: Item; home?: Pick<Settings, 'homeAddress' | 'homeLat' | 'homeLng'> }) {
   const address = item.address?.trim() || '';
   const place = item.placeName?.trim() || '';
+  const phone = item.phone?.trim() || '';
   const dest = address || place;
-  if (!dest) return null;
+  const call = phone ? telHref(phone) : '';
+  const lookup = !call && (place || address) ? mapsSearchUrl([place, address].filter(Boolean).join(' ')) : '';
+  if (!dest && !call && !lookup) return null;
   const origin = home?.homeAddress?.trim() || '';
   const located = item.geoState === 'ok' && item.lat != null && item.lng != null;
   const km = located && home?.homeLat != null && home.homeLng != null ? distanceKm({ lat: home.homeLat, lng: home.homeLng }, { lat: item.lat!, lng: item.lng! }) : null;
-  const href = located && origin ? mapsNavigateUrl(origin, dest) : mapsSearchUrl(dest);
+  const href = dest ? (located && origin ? mapsNavigateUrl(origin, dest) : mapsSearchUrl(dest)) : '';
   return (
     <div className="place-nav">
       {address ? <div className="small" data-testid="item-address">{address}</div> : null}
       <div className="place-nav-row">
         {km != null ? <span className="distance" data-testid="item-distance">{formatDistance(km)}</span> : null}
-        <a className="map-link" href={href} target="_blank" rel="noopener noreferrer" data-testid="item-nav" onClick={(e) => e.stopPropagation()}>{located ? '導航' : '在地圖上搜尋'}</a>
+        {href ? <a className="map-link" href={href} target="_blank" rel="noopener noreferrer" data-testid="item-nav" onClick={(e) => e.stopPropagation()}>{located ? '導航' : '在地圖上搜尋'}</a> : null}
+        {call ? <span className="phone-text" data-testid="item-phone">{phone}</span> : null}
+        {call ? <a className="call-link" href={call} data-testid="item-call" onClick={(e) => e.stopPropagation()}>撥打</a> : null}
+        {lookup ? <a className="lookup-link" href={lookup} target="_blank" rel="noopener noreferrer" data-testid="item-lookup" onClick={(e) => e.stopPropagation()}>查電話</a> : null}
       </div>
     </div>
   );
@@ -83,7 +90,7 @@ export function EmptyMark() {
   );
 }
 
-export function Field({ label, value, onChange, placeholder, multiline, required, inputMode, name }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; multiline?: boolean; required?: boolean; inputMode?: 'url' | 'text'; name?: string }) {
+export function Field({ label, value, onChange, placeholder, multiline, required, inputMode, name }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; multiline?: boolean; required?: boolean; inputMode?: 'url' | 'text' | 'tel'; name?: string }) {
   const id = useId();
   return (
     <div className="field">

@@ -22,6 +22,8 @@ export interface Item {
   summary: string;
   /** 貼文或使用者寫明的地址。沒有就空字串，不猜。 */
   address: string;
+  /** 可撥打的電話。沒有明確號碼就空字串，不猜。 */
+  phone: string;
   /** 地理編碼結果。失敗不填座標。 */
   lat?: number;
   lng?: number;

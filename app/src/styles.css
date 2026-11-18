@@ -201,6 +201,10 @@ span.star { font-size: 16px; cursor: default; }
 .place-nav-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .distance { font-size: 13px; font-weight: 650; color: var(--primary); }
 .map-link { font-size: 13px; font-weight: 650; color: var(--accent); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+.phone-text { font-size: 13px; font-weight: 650; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.call-link { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 4px 14px; border-radius: 999px; background: #8d3b22; color: #fffaf6; font-size: 14px; font-weight: 700; text-decoration: none; letter-spacing: 0.04em; }
+@media (prefers-color-scheme: dark) { .call-link { background: var(--primary); color: var(--on-primary); } }
+.lookup-link { font-size: 12px; font-weight: 600; color: var(--text2); text-decoration: underline; text-underline-offset: 2px; min-height: 32px; display: inline-flex; align-items: center; }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(28, 18, 12, .46); display: flex; flex-direction: column; justify-content: flex-end; }
 .sheet-dismiss { flex: 1; border: none; background: transparent; min-height: 40px; }
 .sheet {

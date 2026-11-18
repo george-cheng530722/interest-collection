@@ -33,6 +33,7 @@ export function ConfirmAddSheet({ draft, onChange, onCancel, onConfirm }: { draf
       <Field label="名稱" value={draft.name} onChange={(name) => onChange({ name })} />
       <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="讀不到店名就留白" />
       <Field label="地址" value={draft.address} onChange={(address) => onChange({ address })} placeholder="沒有寫地址就留白" />
+      <Field label="電話" value={draft.phone} onChange={(phone) => onChange({ phone })} placeholder="沒有電話就留白" inputMode="tel" />
       <div className="label">分類</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填，已預填，請確認）</div>
@@ -65,6 +66,7 @@ export function ManualSheet({ draft, reason, onChange, onCancel, onSave }: { dra
       <Field label="名稱" required value={draft.name} onChange={(name) => onChange({ name })} placeholder="例如：大稻埕拉麵" />
       <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="沒有可靠店名就留白" />
       <Field label="地址" value={draft.address} onChange={(address) => onChange({ address })} placeholder="沒有寫地址就留白" />
+      <Field label="電話" value={draft.phone} onChange={(phone) => onChange({ phone })} placeholder="沒有電話就留白" inputMode="tel" />
       <Field label="說明" value={draft.caption} onChange={(caption) => onChange({ caption })} placeholder="這則貼文在說什麼？" multiline />
       <Field label="帳號" required value={draft.handle} onChange={(handle) => onChange({ handle: handle.replace(/^@/, '').trim() })} placeholder="例如：aming.ramen" />
       <div className="label">分類（必填）</div>

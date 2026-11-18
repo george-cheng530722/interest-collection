@@ -126,6 +126,44 @@ describe('功能: 清單、篩選與地區', () => {
     expect((await store.getItems()).find((i) => i.id === 'h')?.city).toBe('花蓮');
   });
 
+  it('情境: 地區下拉與篩選把林口排在最前面', async () => {
+    const store = await makeDevice().open();
+    await preload(store, [...FIXTURE, makeItem({ id: 'lk', name: '林口咖啡', city: '林口', category: '喝' })]);
+    const { user } = await renderApp({ store });
+    const city = within(screen.getByRole('group', { name: '地區篩選' }));
+    const labels = city.getAllByRole('button').map((b) => (b.textContent || '').replace(/\s+\d+$/, ''));
+    expect(labels[0]).toBe('地區');
+    expect(labels.indexOf('林口')).toBeGreaterThan(0);
+    expect(labels.indexOf('林口')).toBeLessThan(labels.indexOf('台北'));
+    expect(labels.indexOf('台北')).toBeLessThan(labels.indexOf('新北'));
+    await user.click(screen.getByRole('button', { name: '北部週末' }));
+    const sel = screen.getByRole('combobox', { name: '地區' });
+    expect(within(sel).getAllByRole('option').map((o) => o.textContent)).toEqual(['林口', '台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他']);
+  });
+
+  it('情境: 已存的地區維持原樣不會改成林口', async () => {
+    const store = await makeDevice().open();
+    await preload(store, [makeItem({ id: 'keep', name: '板橋早餐', city: '新北', caption: '朋友說林口也有分店' })]);
+    await renderApp({ store });
+    expect((await store.getItems()).find((i) => i.id === 'keep')?.city).toBe('新北');
+    expect(within(screen.getByRole('button', { name: '板橋早餐' })).getByTestId('item-city')).toHaveTextContent('新北');
+  });
+
+  it('情境: 分類可以選合作機會、好構想、生活技巧', async () => {
+    const { user } = await setup();
+    const filter = within(screen.getByRole('group', { name: '分類篩選' }));
+    for (const name of ['吃', '喝', '玩', '有趣', '想 follow 學習', '合作機會', '好構想', '生活技巧']) {
+      expect(filter.getByRole('button', { name: new RegExp('^' + name) })).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole('button', { name: '師大雞排' }));
+    const group = within(screen.getByRole('group', { name: '分類' }));
+    await user.click(group.getByRole('button', { name: '合作機會' }));
+    expect(group.getByRole('button', { name: '合作機會' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: '返回' }));
+    await user.click(within(screen.getByRole('group', { name: '分類篩選' })).getByRole('button', { name: /^合作機會/ }));
+    expect(visibleNames()).toEqual(['師大雞排']);
+  });
+
   it('情境: 點一則收藏進入詳情', async () => {
     const { user } = await setup();
     await user.click(screen.getByRole('button', { name: '北部週末' }));

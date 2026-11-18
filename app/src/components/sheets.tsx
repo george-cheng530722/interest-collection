@@ -4,15 +4,15 @@ import { CATEGORIES, defaultEmoji } from '../lib/constants';
 import { DEFAULT_PROXY_URL } from '../lib/types';
 import { shortUrl } from '../lib/parse';
 import { failMessage, type FailReason } from '../lib/fetchMeta';
-import { copyText, downloadText, exportCsv, exportFileName, exportText, itemName, lineItShareUrl, lineShareUrl } from '../lib/share';
+import { copyText, downloadText, exportCsv, exportFileName, exportText, itemDateLabel, itemName, lineItShareUrl, lineShareUrl } from '../lib/share';
 import { fileToThumbDataUrl } from '../lib/image';
 import type { StoreKind } from '../lib/storage';
-import { Btn, Chip, CitySelect, Field, Preview, Sheet, SourceTag, Stars, Tag, Thumb } from './ui';
+import { Btn, categoryTone, Chip, CitySelect, Field, Preview, Sheet, SourceTag, Stars, Tag, Thumb } from './ui';
 
 function CategoryPicker({ value, onChange }: { value: Category | ''; onChange: (c: Category | '') => void }) {
   return (
     <div role="group" aria-label="分類" className="chips-wrap">
-      {CATEGORIES.map((c) => <Chip key={c} label={c} active={value === c} onClick={() => onChange(value === c ? '' : c)} />)}
+      {CATEGORIES.map((c) => <Chip key={c} tone={categoryTone(c)} label={c} active={value === c} onClick={() => onChange(value === c ? '' : c)} />)}
     </div>
   );
 }
@@ -31,6 +31,7 @@ export function ConfirmAddSheet({ draft, onChange, onCancel, onConfirm }: { draf
       </div>
       {draft.caption ? <p className="caption">{draft.caption}</p> : null}
       <Field label="名稱" value={draft.name} onChange={(name) => onChange({ name })} />
+      <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="讀不到店名就留白" />
       <div className="label">分類</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填，已預填，請確認）</div>
@@ -61,6 +62,7 @@ export function ManualSheet({ draft, reason, onChange, onCancel, onSave }: { dra
       </div>
       <div className="tags"><span className="muted">來源</span><SourceTag source={draft.source} /><span className="muted small">{shortUrl(draft.url)}</span></div>
       <Field label="名稱" required value={draft.name} onChange={(name) => onChange({ name })} placeholder="例如：大稻埕拉麵" />
+      <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="沒有可靠店名就留白" />
       <Field label="說明" value={draft.caption} onChange={(caption) => onChange({ caption })} placeholder="這則貼文在說什麼？" multiline />
       <Field label="帳號" required value={draft.handle} onChange={(handle) => onChange({ handle: handle.replace(/^@/, '').trim() })} placeholder="例如：aming.ramen" />
       <div className="label">分類（必填）</div>
@@ -132,7 +134,7 @@ export function ShareSheet({ title, text, singleUrl, onClose }: { title: string;
       <div className="label">要傳給 LINE 好友的內容</div>
       <Preview text={text} label="分享內容預覽" />
       <div className="col">
-        <a className="btn btn-primary btn-block btn-line" href={lineShareUrl(text)} target="_blank" rel="noopener noreferrer" data-testid="line-share-link">用 LINE 分享</a>
+        <a className="btn btn-primary btn-block btn-line" href={lineShareUrl(text)} target="_blank" rel="noopener noreferrer" data-testid="line-share-link"><span className="badge-dot dot-line" aria-hidden="true" />用 LINE 分享</a>
         <div className="row">
           <Btn label={copied || '複製內容'} onClick={async () => setCopied((await copyText(text)) ? '已複製' : '無法自動複製，請長按上方文字')} block />
           {canNativeShare ? <Btn label="系統分享…" onClick={() => { navigator.share({ text }).catch(() => undefined); }} block /> : null}
@@ -168,6 +170,21 @@ export function ExportSheet({ visibleRows, allRows, listName, onClose }: { visib
         <Btn label={fmt === 'csv' ? '下載 CSV' : '下載文字檔'} primary onClick={() => setMsg(downloadText(exportFileName(fmt === 'csv' ? 'csv' : 'txt'), text, fmt === 'csv' ? 'text/csv' : 'text/plain') ? '已下載（iPhone 會存到「檔案」或顯示預覽）' : '下載失敗，請改用複製')} block />
       </div>
       {msg ? <div className="ok" role="status">{msg}</div> : null}
+    </Sheet>
+  );
+}
+
+export function DuplicateSheet({ item, onOpen, onCancel, onSaveAnyway }: { item: Item; onOpen: () => void; onCancel: () => void; onSaveAnyway: () => void }) {
+  return (
+    <Sheet title="這則已經收藏過了" onClose={onCancel}>
+      <p>這則連結已經在收藏裡。要打開原本那一則，還是仍要再存一筆？</p>
+      <div className="dup-card">
+        <div className="strong">{itemName(item)}</div>
+        {item.placeName?.trim() && item.placeName.trim() !== itemName(item) ? <div className="place-name">{item.placeName.trim()}</div> : null}
+        <div className="muted small">{itemDateLabel(item.createdAt)} · {item.city || '其他'}</div>
+      </div>
+      <div className="row"><Btn label="取消" onClick={onCancel} block /><Btn label="打開這則" onClick={onOpen} primary block /></div>
+      <Btn label="仍要儲存" onClick={onSaveAnyway} block />
     </Sheet>
   );
 }

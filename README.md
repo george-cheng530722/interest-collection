@@ -1,4 +1,4 @@
-# George 的 興趣收藏（PWA）
+# George's Picks（PWA）
 
 離線優先、單機的手機網頁 App。資料只存在使用者自己的裝置（IndexedDB），沒有帳號、沒有伺服器。
 

@@ -3,19 +3,50 @@ import type { Category, Item, Source } from '../lib/types';
 import { thumbLabel } from '../lib/thumbs';
 import { CITIES, isKnownCity } from '../lib/constants';
 
-export function Chip({ label, count, active, onClick, disabled }: { label: string; count?: number; active: boolean; onClick: () => void; disabled?: boolean }) {
+export type ChipTone = 'ig' | 'threads' | 'x' | 'line' | 'eat' | 'drink' | 'play' | 'fun' | 'learn' | 'collab' | 'idea' | 'life' | 'region';
+
+export function Chip({ label, count, active, onClick, disabled, tone }: { label: string; count?: number; active: boolean; onClick: () => void; disabled?: boolean; tone?: ChipTone }) {
   return (
-    <button type="button" className={'chip' + (active ? ' chip-on' : '')} aria-pressed={active} onClick={onClick} disabled={disabled}>
+    <button type="button" className={'chip' + (active ? ' chip-on' : '') + (tone ? ' chip-tone-' + tone : '')} aria-pressed={active} onClick={onClick} disabled={disabled}>
       {label}{count != null ? <span className="chip-count"> {count}</span> : null}
     </button>
   );
 }
 
-export function Btn({ label, onClick, primary, danger, disabled, block, type = 'button' }: { label: string; onClick?: () => void; primary?: boolean; danger?: boolean; disabled?: boolean; block?: boolean; type?: 'button' | 'submit' }) {
+export function Icon({ name }: { name: 'back' | 'settings' | 'share' | 'plus' }) {
+  const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+  if (name === 'back') return <svg {...common}><path d="M15 6 9 12l6 6" /></svg>;
+  if (name === 'settings') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M12 3.5v2.2M12 18.3V20.5M4.9 6.6l1.6 1.6M17.5 15.8l1.6 1.6M3.5 12h2.2M18.3 12H20.5M4.9 17.4l1.6-1.6M17.5 8.2l1.6-1.6" /></svg>;
+  if (name === 'plus') return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>;
+  return <svg {...common}><circle cx="18" cy="5" r="2.2" /><circle cx="6" cy="12" r="2.2" /><circle cx="18" cy="19" r="2.2" /><path d="m8 11 8-5M8 13l8 5" /></svg>;
+}
+
+export function Btn({ label, onClick, primary, danger, disabled, block, type = 'button', icon }: { label: string; onClick?: () => void; primary?: boolean; danger?: boolean; disabled?: boolean; block?: boolean; type?: 'button' | 'submit'; icon?: 'back' | 'settings' | 'share' | 'plus' }) {
   return (
-    <button type={type} className={['btn', primary ? 'btn-primary' : '', danger ? 'btn-danger' : '', block ? 'btn-block' : ''].join(' ').trim()} onClick={onClick} disabled={disabled}>
-      {label}
+    <button type={type} className={['btn', primary ? 'btn-primary' : '', danger ? 'btn-danger' : '', block ? 'btn-block' : '', icon ? 'btn-icon' : ''].join(' ').trim()} onClick={onClick} disabled={disabled}>
+      {icon ? <Icon name={icon} /> : null}<span>{label}</span>
     </button>
+  );
+}
+
+/** 書籤標記。圖示與主畫面字標共用，不含文字，方便縮成 PWA 圖示。 */
+export function BrandMark({ size = 36 }: { size?: number }) {
+  return (
+    <svg className="brand-mark" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="14" fill="currentColor" />
+      <path d="M16.5 11.5h15v23.2l-7.5-4.7-7.5 4.7V11.5z" fill="#F6F1EA" />
+      <path d="M24 16.2l1.05 2.2 2.4.32-1.76 1.66.44 2.38L24 21.6l-2.13 1.16.44-2.38-1.76-1.66 2.4-.32L24 16.2z" fill="#C4A574" />
+    </svg>
+  );
+}
+
+export function EmptyMark() {
+  return (
+    <svg className="empty-mark" viewBox="0 0 160 120" aria-hidden="true">
+      <rect x="46" y="18" width="68" height="86" rx="16" fill="currentColor" opacity="0.08" />
+      <path d="M62 28h36v62l-18-11-18 11V28z" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M80 40.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6L80 48.8l-3.2 1.6.6-3.6-2.6-2.5 3.6-.5 1.6-3.3z" fill="currentColor" opacity="0.55" />
+    </svg>
   );
 }
 
@@ -62,11 +93,23 @@ export function Tag({ tone = 'neutral', children }: { tone?: 'neutral' | 'accent
 }
 
 export function SourceTag({ source }: { source: Source }) {
-  return <Tag tone={source === 'Instagram' ? 'ig' : source === 'Threads' ? 'threads' : 'x'}>{source}</Tag>;
+  const tone = source === 'Instagram' ? 'ig' : source === 'Threads' ? 'threads' : 'x';
+  return <Tag tone={tone}><span className={'badge-dot dot-' + tone} aria-hidden="true" />{source}</Tag>;
+}
+
+export function categoryTone(c: Category | ''): ChipTone {
+  if (c === '吃') return 'eat';
+  if (c === '喝') return 'drink';
+  if (c === '玩') return 'play';
+  if (c === '想 follow 學習') return 'learn';
+  if (c === '合作機會') return 'collab';
+  if (c === '好構想') return 'idea';
+  if (c === '生活技巧') return 'life';
+  return 'fun';
 }
 
 function catClass(c: Category | ''): string {
-  return c === '吃' ? 'eat' : c === '喝' ? 'drink' : c === '玩' ? 'play' : c === '想 follow 學習' ? 'learn' : 'fun';
+  return categoryTone(c);
 }
 
 /** 縮圖：本機截圖 → 遠端縮圖（載不到就換後備圖示）→ 分類 emoji */

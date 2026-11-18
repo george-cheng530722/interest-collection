@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "George 的 興趣收藏 — 離線優先、單機的手機網頁 App（PWA）",
+  "description": "George's Picks — 離線優先、單機的手機網頁 App（PWA）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

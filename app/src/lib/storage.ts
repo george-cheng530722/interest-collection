@@ -1,6 +1,7 @@
 import type { Item, Settings } from './types';
 import { DEFAULT_PROXY_URL, DEFAULT_SETTINGS } from './types';
 import { canonicalCity, DEMO_ITEM_IDS, DEMO_ITEM_URLS } from './constants';
+import { extractPlaceName, shortSummary } from './place';
 import { sameUrl } from './parse';
 
 export type StoreKind = 'indexeddb' | 'localstorage' | 'memory';
@@ -168,7 +169,29 @@ export async function loadSettings(store: Store): Promise<Settings> {
   return migrated;
 }
 
-/** 舊版正式地區名稱（台北市…）轉成新名稱並寫回；不認得的自訂地區原樣保留 */
+/**
+ * 舊收藏沒有店家名稱或短簡介時補上並寫回。
+ * 已經有字串（含使用者留白的空字串）不覆蓋。全文 caption 原樣保留。地區也不在這裡改。
+ */
+export async function migratePlaceAndSummary(store: Store): Promise<void> {
+  const items = await store.getItems();
+  for (const it of items) {
+    const raw = it as Item & { placeName?: unknown; summary?: unknown };
+    const next: Item = { ...it, placeName: typeof raw.placeName === 'string' ? raw.placeName : '', summary: typeof raw.summary === 'string' ? raw.summary : '' };
+    let changed = false;
+    if (typeof raw.placeName !== 'string') {
+      next.placeName = extractPlaceName(it.name || '', it.caption || '');
+      changed = true;
+    }
+    if (typeof raw.summary !== 'string') {
+      next.summary = shortSummary(it.caption || '');
+      changed = true;
+    }
+    if (changed) await store.putItem(next);
+  }
+}
+
+/** 舊版正式地區名稱（台北市…）轉成新名稱並寫回；不認得的自訂地區原樣保留。不會把新北改成林口。 */
 export async function migrateLegacyCities(store: Store): Promise<void> {
   const items = await store.getItems();
   for (const it of items) {

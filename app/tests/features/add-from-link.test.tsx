@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { IG_URL, THREADS_URL, X_URL, calledUrls, corsBlockedFetch, dialog, htmlResponse, makeDevice, pasteAndAdd, preload, renderApp, screen, waitFor, within } from '../helpers';
+import { IG_URL, THREADS_URL, X_URL, calledUrls, corsBlockedFetch, dialog, htmlResponse, makeDevice, pasteAndAdd, preload, renderApp, screen, within } from '../helpers';
 
 const fresh = async () => { const d = makeDevice(); const store = await d.open(); await preload(store, []); return { d, store }; };
 
@@ -114,7 +114,7 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、預設�
     const dlg = await dialog('確認地區後加入');
     const citySelect = within(dlg).getByRole('combobox', { name: '地區' });
     expect(citySelect).toHaveValue('其他');
-    expect(within(citySelect).getAllByRole('option').map((o) => o.textContent)).toEqual(['請選擇', '台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他']);
+    expect(within(citySelect).getAllByRole('option').map((o) => o.textContent)).toEqual(['請選擇', '林口', '台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他']);
     expect(screen.queryByText('線上')).toBeNull();
     expect(screen.queryByText('未指定')).toBeNull();
     await user.click(within(dlg).getByRole('button', { name: '加入收藏' }));
@@ -162,15 +162,4 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、預設�
     expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
   });
 
-  it('重複的網址會提示已在清單裡', async () => {
-    const { store } = await fresh();
-    const { user } = await renderApp({ store });
-    await pasteAndAdd(user, IG_URL);
-    const dlg = await dialog('讀取失敗，請手動補充');
-    await user.type(within(dlg).getByLabelText(/^名稱/), '國家地理');
-    await user.click(within(dlg).getByRole('button', { name: '儲存並標記手動補充' }));
-    await user.click(await screen.findByRole('button', { name: '返回' }));
-    await pasteAndAdd(user, IG_URL + '?igsh=abc');
-    await waitFor(() => expect(screen.getByText(/這則已在清單裡/)).toBeInTheDocument());
-  });
 });

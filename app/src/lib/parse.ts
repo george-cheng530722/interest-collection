@@ -63,8 +63,39 @@ export function normalizeUrl(raw: string): string {
   } catch { return raw.trim(); }
 }
 
+/**
+ * 貼文本身的身分：IG／Threads 用貼文編號（不看帳號、reel 或 p），X 用 status id。
+ * 編號保留大小寫。對不到編號時回傳 null，改由網址字串比較。
+ */
+export function postIdentity(raw: string): string | null {
+  let u: URL;
+  try { u = new URL(normalizeUrl(raw)); } catch { return null; }
+  const host = bareHost(u.hostname);
+  const segs = u.pathname.split('/').filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
+  const after = (labels: string[]) => {
+    const i = segs.findIndex((p) => labels.includes(p.toLowerCase()));
+    return i >= 0 ? segs[i + 1] || '' : '';
+  };
+  if (host === 'instagram.com' || host === 'instagr.am') {
+    const id = after(['p', 'reel', 'reels', 'tv']);
+    return id ? 'ig:' + id : null;
+  }
+  if (host === 'threads.net' || host === 'threads.com') {
+    const id = after(['post']);
+    return id ? 'th:' + id : null;
+  }
+  if (host === 'x.com' || host === 'twitter.com') {
+    const id = after(['status']);
+    return id ? 'x:' + id : null;
+  }
+  return null;
+}
+
 export function sameUrl(a: string, b: string): boolean {
-  const n = (s: string) => normalizeUrl(s).replace(/^https?:\/\/(www\.)?/, '').replace(/threads\.com/, 'threads.net').replace(/\/$/, '').toLowerCase();
+  const ka = postIdentity(a);
+  const kb = postIdentity(b);
+  if (ka && kb) return ka === kb;
+  const n = (s: string) => normalizeUrl(s).replace(/^https?:\/\/(www\.)?/, '').replace(/threads\.com/i, 'threads.net').replace(/\/+$/, '').toLowerCase();
   return n(a) === n(b);
 }
 
@@ -101,13 +132,17 @@ export function classify(text: string): Category {
   if (/喝|咖啡|手沖|手搖|茶|啤酒|烏龍|酒吧|latte|coffee|bar\b/.test(t)) return '喝';
   if (/吃|餐|拉麵|碗粿|雞排|火鍋|小吃|美食|叉燒|炸|香腸|夜市|早午餐|甜點|ramen|food/.test(t)) return '吃';
   if (/玩|旅|景點|一日|行程|九份|巷弄|路線|露營|步道|展覽|樂園|trip|travel/.test(t)) return '玩';
+  if (/合作|業配|邀約|聯名|商務/.test(t)) return '合作機會';
+  if (/構想|點子|靈感/.test(t)) return '好構想';
+  if (/生活技巧|小技巧|妙招|收納|撇步/.test(t)) return '生活技巧';
   return '有趣';
 }
 
 /** 依說明文字推斷地區；判斷不出來一律回傳「其他」 */
 export function inferCity(text: string): City {
   const s = text || '';
-  if (/新北|九份|淡水|三峽|板橋|林口|永和|中和|新店|三重|瑞芳|烏來/.test(s)) return '新北';
+  if (/林口/.test(s)) return '林口';
+  if (/新北|九份|淡水|三峽|板橋|永和|中和|新店|三重|瑞芳|烏來/.test(s)) return '新北';
   if (/台中|臺中|逢甲|一中街|審計新村/.test(s)) return '台中';
   if (/台南|臺南|鹽水|安平|赤崁|國華街/.test(s)) return '台南';
   if (/高雄|駁二|旗津|美濃/.test(s)) return '高雄';

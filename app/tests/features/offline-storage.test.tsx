@@ -78,7 +78,7 @@ describe('功能: 單機儲存與離線使用', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
     unmount();
     render(<App store={await device.open()} fetchImpl={fetchImpl as unknown as typeof fetch} />);
-    await screen.findByRole('heading', { name: 'George 的 興趣收藏' });
+    await screen.findByRole('heading', { name: "George's Picks" });
     const [it] = await store.getItems();
     expect(it).toMatchObject({ name: '阿明拉麵', memo: '離線寫的備註', status: '已完成', rating: 5, review: '好吃' });
   });

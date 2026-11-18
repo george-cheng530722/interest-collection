@@ -1,12 +1,14 @@
 import type { Category, City, Source } from './types';
 
-export const APP_NAME = 'George 的 興趣收藏';
-export const CATEGORIES: Category[] = ['吃', '喝', '玩', '有趣', '想 follow 學習'];
+export const APP_NAME = "George's Picks";
+export const APP_SHORT_NAME = 'Picks';
+export const CATEGORIES: Category[] = ['吃', '喝', '玩', '有趣', '想 follow 學習', '合作機會', '好構想', '生活技巧'];
 /**
- * 地區下拉選單與地區篩選的選項（依此順序，「其他」放最後）。
+ * 地區下拉選單與地區篩選的選項（林口在最前，「其他」放最後）。
  * 「其他」是無法判斷時的預設地區；不使用「線上」或「未指定」。
+ * 已存的地區不會因為新增林口而被改寫。
  */
-export const CITIES: City[] = ['台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他'];
+export const CITIES: City[] = ['林口', '台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他'];
 export const DEFAULT_CITY: City = '其他';
 
 /** 舊版的正式名稱 → 新地區名稱。載入時轉換一次並寫回；其他自訂值原樣保留 */
@@ -40,5 +42,12 @@ export const DEMO_ITEM_URLS = [
 ];
 
 export function defaultEmoji(c: Category | ''): string {
-  return c === '吃' ? '🍜' : c === '喝' ? '☕' : c === '玩' ? '🗺️' : c === '想 follow 學習' ? '📓' : '✨';
+  if (c === '吃') return '🍜';
+  if (c === '喝') return '☕';
+  if (c === '玩') return '🗺️';
+  if (c === '想 follow 學習') return '📓';
+  if (c === '合作機會') return '🤝';
+  if (c === '好構想') return '💡';
+  if (c === '生活技巧') return '🌿';
+  return '✨';
 }

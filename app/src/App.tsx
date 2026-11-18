@@ -3,13 +3,15 @@ import type { Item, Settings } from './lib/types';
 import { DEFAULT_SETTINGS } from './lib/types';
 import { DEFAULT_CITY, defaultEmoji } from './lib/constants';
 import { classify, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
+import { extractPlaceName, shortSummary } from './lib/place';
 import { failMessage, fetchPostMeta, type FailReason } from './lib/fetchMeta';
 import { isThumbExpired, refreshThumb } from './lib/thumbs';
-import { loadSettings, migrateLegacyCities, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
+import { loadSettings, migrateLegacyCities, migratePlaceAndSummary, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
 import { shareItemText, shareListText } from './lib/share';
 import { applyFilters, ListView, type Filters } from './components/ListView';
 import { Detail } from './components/Detail';
-import { ConfirmAddSheet, DeadLinkSheet, DeleteSheet, ExportSheet, ManualSheet, ReviewSheet, SettingsSheet, ShareSheet } from './components/sheets';
+import { ConfirmAddSheet, DeadLinkSheet, DeleteSheet, DuplicateSheet, ExportSheet, ManualSheet, ReviewSheet, SettingsSheet, ShareSheet } from './components/sheets';
+import { BrandMark } from './components/ui';
 
 export interface AppProps {
   store: Store;
@@ -29,7 +31,7 @@ function blankItem(url: string, p: Partial<Item>): Item {
   const now = Date.now();
   const { source, handle } = parseUrlMeta(url);
   return {
-    id: newId(), source: source ?? 'Instagram', url, handle, name: '', caption: '', category: '', city: DEFAULT_CITY,
+    id: newId(), source: source ?? 'Instagram', url, handle, name: '', placeName: '', caption: '', summary: '', category: '', city: DEFAULT_CITY,
     status: '想體驗', memo: '', rating: 0, review: '', manual: false, linkDead: false, thumbState: 'ok',
     emoji: '✨', createdAt: now, updatedAt: now, fetchedVia: 'manual', ...p,
   };
@@ -63,8 +65,11 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState('');
+  const [dupPrompt, setDupPrompt] = useState<{ item: Item; onOpen: () => void; onCancel: () => void; onSaveAnyway: () => void } | null>(null);
   const attempted = useRef(new Set<string>());
   const sharedHandled = useRef(false);
+  const dupBypass = useRef<string | null>(null);
+  const addRef = useRef<(raw?: string) => Promise<void>>(async () => undefined);
 
   const fetchDeps = useCallback(() => ({ fetchImpl, settings: settingsRef.current, online: navigator.onLine !== false }), [fetchImpl]);
 
@@ -79,6 +84,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
       try {
         await removeStoredDemoItems(store);
         await migrateLegacyCities(store);
+        await migratePlaceAndSummary(store);
         const [all, s] = await Promise.all([store.getItems(), loadSettings(store)]);
         const now = Date.now();
         // 上次中斷的更新、或很久以前失敗的縮圖，這次開啟時再自動試一次
@@ -128,7 +134,34 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     setJustAddedId(created.id);
     setOpenId(created.id);
     setFilters({ tab: '想體驗', source: '全部', category: '全部', city: '全部' });
+    dupBypass.current = null;
+    setToast('已加入收藏');
   }, [persist]);
+
+  const askDuplicate = useCallback((url: string, resume: () => void) => {
+    if (dupBypass.current && sameUrl(dupBypass.current, url)) return false;
+    const existing = itemsRef.current.find((x) => sameUrl(x.url, url));
+    if (!existing) return false;
+    setToast('');
+    setDupPrompt({
+      item: existing,
+      onOpen: () => {
+        dupBypass.current = null;
+        setDupPrompt(null);
+        setPending(null);
+        setManual(null);
+        setInput('');
+        setOpenId(existing.id);
+      },
+      onCancel: () => setDupPrompt(null),
+      onSaveAnyway: () => {
+        dupBypass.current = url;
+        setDupPrompt(null);
+        resume();
+      },
+    });
+    return true;
+  }, []);
 
   const removeItem = useCallback(async (id: string) => {
     itemsRef.current = itemsRef.current.filter((x) => x.id !== id);
@@ -175,8 +208,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     if (!text) { setNotice('請先貼上 Instagram、X 或 Threads 的連結。'); return; }
     const url = extractPostUrl(text);
     if (!url) { setNotice('目前支援 Instagram、X 與 Threads 的貼文連結。'); return; }
-    const dup = itemsRef.current.find((x) => sameUrl(x.url, url));
-    if (dup) { setNotice(`這則已在清單裡：「${dup.name || '@' + dup.handle}」。`); return; }
+    if (askDuplicate(url, () => { void addRef.current(text); })) return;
     setNotice('');
     setInput(url);
     if (isLikelyUnreadable(url)) { setInput(''); openManual(url, 'private'); return; }
@@ -186,16 +218,20 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     setInput('');
     if (res.ok) {
       const m = res.meta;
-      const basis = `${m.name} ${m.caption}`;
+      const caption = m.caption;
+      const basis = `${m.name} ${caption}`;
       const category = classify(basis);
       setPending(blankItem(url, {
-        name: m.name, caption: m.caption, handle: m.handle || parseUrlMeta(url).handle, category, city: inferCity(basis),
+        name: m.name, placeName: extractPlaceName(m.name, caption), caption, summary: shortSummary(caption),
+        handle: m.handle || parseUrlMeta(url).handle, category, city: inferCity(basis),
         emoji: defaultEmoji(category), thumbUrl: m.image, thumbExpiresAt: thumbExpiryFromUrl(m.image), fetchedVia: res.via,
       }));
     } else {
       openManual(url, res.reason);
     }
-  }, [input, fetchDeps, openManual]);
+  }, [input, fetchDeps, openManual, askDuplicate]);
+
+  addRef.current = add;
 
   // 從捷徑／分享帶 ?url= 進來時，自動走同一套加入流程
   useEffect(() => {
@@ -238,7 +274,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     setUsage(e && e.quota ? `已用約 ${(e.usage / 1024 / 1024).toFixed(1)} MB／可用約 ${(e.quota / 1024 / 1024).toFixed(0)} MB` : '');
   };
 
-  if (!loaded) return <div className="screen center-col"><p className="muted">載入中…</p></div>;
+  if (!loaded) return <div className="screen center-col loading-screen"><BrandMark /><p className="muted">載入中…</p></div>;
 
   return (
     <div className="app">
@@ -271,17 +307,26 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
         />
       )}
 
-      {pending ? <ConfirmAddSheet draft={pending} onChange={(p) => setPending((d) => (d ? { ...d, ...p } : d))} onCancel={() => setPending(null)} onConfirm={() => {
+      {pending ? <ConfirmAddSheet draft={pending} onChange={(p) => setPending((d) => (d ? { ...d, ...p } : d))} onCancel={() => { dupBypass.current = null; setPending(null); }} onConfirm={() => {
         if (!pending.city || !pending.category) return;
-        insertItem({ ...pending, createdAt: Date.now(), updatedAt: Date.now() });
-        setPending(null);
+        const save = () => {
+          insertItem({ ...pending, placeName: pending.placeName.trim(), summary: pending.summary || shortSummary(pending.caption), createdAt: Date.now(), updatedAt: Date.now() });
+          setPending(null);
+        };
+        if (askDuplicate(pending.url, save)) return;
+        save();
       }} /> : null}
 
-      {manual ? <ManualSheet draft={manual.draft} reason={manual.reason} onChange={(p) => setManual((m) => (m ? { ...m, draft: { ...m.draft, ...p } } : m))} onCancel={() => setManual(null)} onSave={() => {
+      {manual ? <ManualSheet draft={manual.draft} reason={manual.reason} onChange={(p) => setManual((m) => (m ? { ...m, draft: { ...m.draft, ...p } } : m))} onCancel={() => { dupBypass.current = null; setManual(null); }} onSave={() => {
         const d = manual.draft;
         if (!d.name.trim() || !d.handle.trim() || !d.category || !d.city) return;
-        insertItem({ ...d, name: d.name.trim(), caption: d.caption.trim(), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
-        setManual(null);
+        const save = () => {
+          const caption = d.caption.trim();
+          insertItem({ ...d, name: d.name.trim(), placeName: d.placeName.trim(), caption, summary: shortSummary(caption), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
+          setManual(null);
+        };
+        if (askDuplicate(d.url, save)) return;
+        save();
       }} /> : null}
 
       {reviewItem ? <ReviewSheet item={reviewItem} onCancel={() => setReviewFor(null)} onConfirm={(rating, review) => {
@@ -297,6 +342,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
       {exportOpen ? <ExportSheet visibleRows={visible} allRows={[...items].sort((a, b) => b.createdAt - a.createdAt)} listName={listName} onClose={() => setExportOpen(false)} /> : null}
       {settingsOpen ? <SettingsSheet settings={settings} storeKind={store.kind} usage={usage} onClose={() => setSettingsOpen(false)} onChange={(s) => { setSettings(s); settingsRef.current = s; void saveSettings(store, s).catch(reportStorageError); }} /> : null}
 
+      {dupPrompt ? <DuplicateSheet item={dupPrompt.item} onOpen={dupPrompt.onOpen} onCancel={dupPrompt.onCancel} onSaveAnyway={dupPrompt.onSaveAnyway} /> : null}
       {toast ? <div className="toast" role="status">{toast}</div> : null}
     </div>
   );

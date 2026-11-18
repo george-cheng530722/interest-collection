@@ -15,7 +15,7 @@ describe('分享與匯出文字', () => {
   });
   it('清單分享', () => {
     const t = shareListText('想體驗', [a, b]);
-    expect(t.split('\n')[0]).toBe('George 的 興趣收藏｜想體驗');
+    expect(t.split('\n')[0]).toBe("George's Picks｜想體驗");
     expect(t).toContain('1. 阿明, "拉麵"（台北）');
     expect(t).toContain('2. 碗粿（台南）');
   });

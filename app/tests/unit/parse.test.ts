@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classify, detectSource, extractPostUrl, inferCity, isLikelyUnreadable, normalizeUrl, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from '../../src/lib/parse';
+import { classify, detectSource, extractPostUrl, inferCity, isLikelyUnreadable, normalizeUrl, parseUrlMeta, postIdentity, sameUrl, thumbExpiryFromUrl } from '../../src/lib/parse';
 import { CITIES } from '../../src/lib/constants';
 
 describe('來源辨識與帳號解析', () => {
@@ -31,7 +31,11 @@ describe('從 LINE 分享文字找出貼文網址', () => {
     expect(extractPostUrl('沒有網址')).toBeNull();
   });
   it('sameUrl 忽略 www、尾斜線、threads.com／net 差異', () => {
-    expect(sameUrl('https://www.threads.net/@a/post/B', 'https://threads.com/@a/post/B/')).toBe(true);
+    expect(sameUrl('https://www.threads.net/@a/post/B', 'https://threads.com/@other/post/B/')).toBe(true);
+    expect(sameUrl('https://www.instagram.com/natgeo/p/AbC/', 'https://instagram.com/reel/AbC?igsh=1&utm_source=ig')).toBe(true);
+    expect(sameUrl('https://twitter.com/jack/status/20?s=46&t=zz', 'https://x.com/someone/status/20')).toBe(true);
+    expect(sameUrl('https://www.instagram.com/p/AbC/', 'https://www.instagram.com/p/AbD/')).toBe(false);
+    expect(postIdentity('https://www.instagram.com/p/AbC/')).toBe('ig:AbC');
     expect(sameUrl('https://www.instagram.com/p/A/?igsh=1', 'https://instagram.com/p/A')).toBe(true);
     expect(normalizeUrl('https://x.com/a/status/1#frag')).toBe('https://x.com/a/status/1');
   });
@@ -58,6 +62,8 @@ describe('分類、地區、私人判斷、縮圖到期', () => {
   it('地區用新名稱（台北、桃竹、宜蘭…），不再回傳「台北市」這類舊名稱', () => {
     expect(inferCity('台北車站')).toBe('台北');
     expect(inferCity('九份老街')).toBe('新北');
+    expect(inferCity('林口outlet')).toBe('林口');
+    expect(inferCity('新北板橋')).toBe('新北');
     expect(inferCity('桃園機場')).toBe('桃竹');
     expect(inferCity('中壢夜市')).toBe('桃竹');
     expect(inferCity('大溪老街')).toBe('桃竹');
@@ -73,6 +79,10 @@ describe('分類、地區、私人判斷、縮圖到期', () => {
     expect(classify('九份路線')).toBe('玩');
     expect(classify('店面動線筆記')).toBe('想 follow 學習');
     expect(classify('橘貓店長')).toBe('有趣');
+    expect(classify('想找合作業配')).toBe('合作機會');
+    expect(classify('這個構想不錯')).toBe('好構想');
+    expect(classify('三個生活小技巧')).toBe('生活技巧');
+    expect(classify('叉燒拉麵')).toBe('吃');
   });
   it('私人／限制年齡標記', () => {
     expect(isLikelyUnreadable('https://www.instagram.com/a/p/PrivateX/')).toBe(true);

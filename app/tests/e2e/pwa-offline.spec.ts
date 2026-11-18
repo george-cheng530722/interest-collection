@@ -20,9 +20,9 @@ async function manualAdd(page: Page, url: string, name: string) {
 
 test('PWA：manifest、Service Worker 註冊並快取殼層', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: 'George 的 興趣收藏' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "George's Picks" })).toBeVisible();
   const manifest = await (await page.request.get('./manifest.webmanifest')).json();
-  expect(manifest).toMatchObject({ name: 'George 的 興趣收藏', display: 'standalone', start_url: './' });
+  expect(manifest).toMatchObject({ name: "George's Picks", display: 'standalone', start_url: './' });
   const cached = await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
     const keys = await caches.keys();
@@ -44,7 +44,7 @@ test('情境: 加到主畫面後離線仍能開啟與編輯（真的 Service Wor
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'George 的 興趣收藏' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "George's Picks" })).toBeVisible();
   await expect(page.getByText('離線中')).toBeVisible();
   await expect(page.getByRole('button', { name: '測試店' })).toBeVisible();
 
@@ -121,7 +121,7 @@ test('單檔 HTML（file://）：可開啟、可操作、使用本機儲存，�
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(file);
-  await expect(page.getByRole('heading', { name: 'George 的 興趣收藏' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "George's Picks" })).toBeVisible();
   expect(await page.evaluate(() => navigator.serviceWorker?.controller ?? null)).toBeNull();
   await manualAdd(page, 'https://www.instagram.com/private.single/p/PrivateSingle/', '單檔測試');
   await page.reload();

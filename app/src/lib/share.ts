@@ -5,6 +5,12 @@ export function itemName(item: Pick<Item, 'name' | 'handle'>): string {
   return item.name?.trim() || (item.handle ? '@' + item.handle : '（未命名）');
 }
 
+export function itemDateLabel(t: number): string {
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 export function shareItemText(item: Item): string {
   const lines = [APP_NAME, '', itemName(item), `地區：${item.city || '其他'}`, item.url];
   if (item.memo.trim()) lines.push(`備註：${item.memo.trim()}`);

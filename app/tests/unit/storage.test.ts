@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
-import { idbStore, isKnownDemoItem, isLegacyProxyUrl, loadSettings, localStore, memoryStore, migrateLegacyCities, openIdb, removeStoredDemoItems, saveSettings, StorageFullError } from '../../src/lib/storage';
-import { DEFAULT_PROXY_URL, type Settings } from '../../src/lib/types';
+import { idbStore, isKnownDemoItem, isLegacyProxyUrl, loadSettings, localStore, memoryStore, migrateLegacyCities, migratePlaceAndSummary, openIdb, removeStoredDemoItems, saveSettings, StorageFullError } from '../../src/lib/storage';
+import { DEFAULT_PROXY_URL, type Item, type Settings } from '../../src/lib/types';
 import { makeItem } from '../helpers';
 
 describe('本機儲存', () => {
@@ -81,5 +81,22 @@ describe('本機儲存', () => {
     await migrateLegacyCities(s);
     const byId = new Map((await s.getItems()).map((it) => [it.id, it.city]));
     old.forEach(([, want], i) => expect(byId.get('c' + i)).toBe(want));
+  });
+
+  it('舊收藏補店名與短簡介；已填的值與新北地區都不改', async () => {
+    const s = memoryStore();
+    const legacy = makeItem({ id: 'old', name: '舊', city: '新北', caption: '店名：舊店\n林口也有人推薦，但這筆地區維持新北。' + '很長的句子。'.repeat(20) });
+    delete (legacy as Partial<Item>).placeName;
+    delete (legacy as Partial<Item>).summary;
+    await s.putItem(legacy);
+    await s.putItem(makeItem({ id: 'mine', name: '自訂', city: '新北', caption: '📍 別覆蓋', placeName: '', summary: '留白的簡介' }));
+    await migratePlaceAndSummary(s);
+    await migrateLegacyCities(s);
+    const old = (await s.getItems()).find((i) => i.id === 'old')!;
+    expect(old.city).toBe('新北');
+    expect(old.placeName).toBe('舊店');
+    expect(old.caption.startsWith('店名：舊店')).toBe(true);
+    expect([...old.summary].length).toBeLessThanOrEqual(120);
+    expect((await s.getItems()).find((i) => i.id === 'mine')).toMatchObject({ city: '新北', placeName: '', summary: '留白的簡介' });
   });
 });

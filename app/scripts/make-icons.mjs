@@ -25,19 +25,19 @@ function png(size, pixel) {
   ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
-// 橘色底 + 奶白色書籤（收藏）+ 小星星
+// 深色底滿版（maskable 安全區內放書籤＋淡金星），與畫面標記同一造型
 function pixel(u, v) {
-  const bg = [194, 65, 12, 255];
-  const cream = [250, 247, 242, 255];
-  const gold = [251, 191, 36, 255];
-  // 書籤：x 0.32–0.68，y 0.22–0.80，底部 V 形缺口
-  const inX = u >= 0.32 && u <= 0.68;
-  const notch = v > 0.62 && Math.abs(u - 0.5) < (v - 0.62) * 0.95;
-  if (inX && v >= 0.22 && v <= 0.8 && !notch) {
-    // 星星（五角星近似：極座標）
-    const cx = u - 0.5, cy = v - 0.42; const r = Math.hypot(cx, cy); const t = Math.atan2(cy, cx) + Math.PI / 2;
-    const k = Math.cos((5 * t) % (2 * Math.PI)) * 0.5 + 0.5;
-    if (r < 0.06 + 0.06 * k) return gold;
+  const bg = [44, 33, 28, 255];
+  const cream = [246, 241, 234, 255];
+  const gold = [196, 165, 116, 255];
+  const inX = u >= 0.34 && u <= 0.66;
+  const notch = v > 0.64 && Math.abs(u - 0.5) < (v - 0.64) * 0.9;
+  if (inX && v >= 0.24 && v <= 0.76 && !notch) {
+    const cx = u - 0.5, cy = v - 0.42;
+    const r = Math.hypot(cx, cy);
+    const t = Math.atan2(cy, cx) + Math.PI / 2;
+    const k = Math.cos(5 * t) * 0.5 + 0.5;
+    if (r < 0.045 + 0.045 * k) return gold;
     return cream;
   }
   return bg;

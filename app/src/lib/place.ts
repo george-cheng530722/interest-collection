@@ -113,6 +113,14 @@ function fromText(text: string): string {
   return labeledStore(src) || fromPin(src) || fromLocationHandle(src) || leadingBracket(src) || fromAddress(src) || '';
 }
 
+/** 只取明確的「地址：」那一行。沒有這行就回傳空字串，不把店名當成地址。 */
+export function extractAddress(text: string): string {
+  const m = norm(text).match(/(?:^|\n)\s*地址\s*[:：]\s*([^\n]+)/);
+  if (!m) return '';
+  const line = m[1].trim().replace(/[。！？!?\s]+$/g, '').trim();
+  return line.length >= 2 ? line.slice(0, 80) : '';
+}
+
 /** 先看說明，再看標題。沒有可靠店名就回傳空字串。 */
 export function extractPlaceName(title: string, caption: string): string {
   return fromText(caption) || fromText(title) || '';

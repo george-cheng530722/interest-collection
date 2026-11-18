@@ -164,6 +164,26 @@ describe('功能: 清單、篩選與地區', () => {
     expect(visibleNames()).toEqual(['師大雞排']);
   });
 
+  it('情境: 分類數量與點下去看到的筆數相同', async () => {
+    const store = await makeDevice().open();
+    const eats = [
+      ...[1, 2].map((n) => makeItem({ id: 'ig' + n, name: 'IG吃' + n, category: '吃', source: 'Instagram', url: `https://www.instagram.com/p/EATIG${n}/` })),
+      ...[1, 2, 3, 4, 5, 6].map((n) => makeItem({ id: 'x' + n, name: 'X吃' + n, category: '吃', source: 'X', url: `https://x.com/food/status/${n}` })),
+    ];
+    await preload(store, eats);
+    const { user } = await renderApp({ store });
+    const cat = () => within(screen.getByRole('group', { name: '分類篩選' }));
+    expect(cat().getByRole('button', { name: /^吃\s*8$/ })).toBeInTheDocument();
+    await user.click(cat().getByRole('button', { name: /^吃/ }));
+    expect(screen.getAllByTestId('item-card')).toHaveLength(8);
+    await user.click(within(screen.getByRole('group', { name: '來源篩選' })).getByRole('button', { name: 'Instagram' }));
+    expect(cat().getByRole('button', { name: /^吃\s*2$/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId('item-card')).toHaveLength(2);
+    expect(within(screen.getByRole('group', { name: '來源篩選' })).getByRole('button', { name: 'Instagram' }).textContent).toBe('Instagram');
+    expect(screen.getByRole('button', { name: '想體驗' }).textContent).toBe('想體驗');
+    expect(within(screen.getByRole('group', { name: '地區篩選' })).getByRole('button', { name: '台北' }).textContent).toBe('台北');
+  });
+
   it('情境: 點一則收藏進入詳情', async () => {
     const { user } = await setup();
     await user.click(screen.getByRole('button', { name: '北部週末' }));

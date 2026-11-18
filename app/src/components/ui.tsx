@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { Category, Item, Source } from '../lib/types';
+import type { Category, Item, Settings, Source } from '../lib/types';
 import { thumbLabel } from '../lib/thumbs';
 import { CITIES, isKnownCity } from '../lib/constants';
+import { distanceKm, formatDistance, mapsNavigateUrl, mapsSearchUrl } from '../lib/geo';
 
 export type ChipTone = 'ig' | 'threads' | 'x' | 'line' | 'eat' | 'drink' | 'play' | 'fun' | 'learn' | 'collab' | 'idea' | 'life' | 'region';
 
@@ -29,14 +30,46 @@ export function Btn({ label, onClick, primary, danger, disabled, block, type = '
   );
 }
 
-/** 書籤標記。圖示與主畫面字標共用，不含文字，方便縮成 PWA 圖示。 */
-export function BrandMark({ size = 36 }: { size?: number }) {
+/** 金色皇冠。主畫面用大一點的漸層，PWA 圖示是同一造型。 */
+export function BrandMark({ size = 48 }: { size?: number }) {
+  const gid = useId().replace(/:/g, '');
   return (
-    <svg className="brand-mark" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
-      <rect width="48" height="48" rx="14" fill="currentColor" />
-      <path d="M16.5 11.5h15v23.2l-7.5-4.7-7.5 4.7V11.5z" fill="#F6F1EA" />
-      <path d="M24 16.2l1.05 2.2 2.4.32-1.76 1.66.44 2.38L24 21.6l-2.13 1.16.44-2.38-1.76-1.66 2.4-.32L24 16.2z" fill="#C4A574" />
+    <svg className="brand-mark" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFF6D4" />
+          <stop offset="0.38" stopColor="#F0D078" />
+          <stop offset="0.72" stopColor="#C6A04A" />
+          <stop offset="1" stopColor="#8C6418" />
+        </linearGradient>
+      </defs>
+      <path fill={`url(#${gid})`} d="M10 44 16 20l12 14L32 8l4 26 12-14 6 24z" />
+      <rect x="8" y="44" width="48" height="9" rx="2.5" fill={`url(#${gid})`} />
+      <circle cx="16" cy="18" r="3.2" fill="#FFF8E6" />
+      <circle cx="32" cy="10" r="3.4" fill="#FFF8E6" />
+      <circle cx="48" cy="18" r="3.2" fill="#FFF8E6" />
     </svg>
+  );
+}
+
+/** 有店名或地址才出現。有座標才顯示距離與導航；編碼失敗只留名稱和搜尋連結，不顯示捏造的地址。 */
+export function PlaceNav({ item, home }: { item: Item; home?: Pick<Settings, 'homeAddress' | 'homeLat' | 'homeLng'> }) {
+  const address = item.address?.trim() || '';
+  const place = item.placeName?.trim() || '';
+  const dest = address || place;
+  if (!dest) return null;
+  const origin = home?.homeAddress?.trim() || '';
+  const located = item.geoState === 'ok' && item.lat != null && item.lng != null;
+  const km = located && home?.homeLat != null && home.homeLng != null ? distanceKm({ lat: home.homeLat, lng: home.homeLng }, { lat: item.lat!, lng: item.lng! }) : null;
+  const href = located && origin ? mapsNavigateUrl(origin, dest) : mapsSearchUrl(dest);
+  return (
+    <div className="place-nav">
+      {address ? <div className="small" data-testid="item-address">{address}</div> : null}
+      <div className="place-nav-row">
+        {km != null ? <span className="distance" data-testid="item-distance">{formatDistance(km)}</span> : null}
+        <a className="map-link" href={href} target="_blank" rel="noopener noreferrer" data-testid="item-nav" onClick={(e) => e.stopPropagation()}>{located ? '導航' : '在地圖上搜尋'}</a>
+      </div>
+    </div>
   );
 }
 

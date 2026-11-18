@@ -14,6 +14,8 @@ import { pathToFileURL } from 'node:url';
 
 export const ALLOWED_HOSTS = ['instagram.com', 'www.instagram.com', 'threads.net', 'www.threads.net', 'threads.com', 'www.threads.com', 'x.com', 'www.x.com', 'twitter.com', 'mobile.twitter.com'];
 const UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
+const GEO_UA = 'GeorgesPicks/1.0 (https://george-cheng530722.github.io/interest-collection/)';
+const geoCache = new Map();
 const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
 export function decode(s) {
@@ -51,6 +53,28 @@ export async function fetchMeta(target, fetchImpl = fetch) {
   }
 }
 
+/** Nominatim 地理編碼。快取在這個行程裡，並請上游快取一天。找不到不捏造座標。 */
+export async function fetchGeo(query, fetchImpl = fetch) {
+  const q = (query || '').trim().slice(0, 120);
+  if (q.length < 2) return { code: 400, body: { error: '請提供地址或店名' } };
+  if (geoCache.has(q)) return { code: 200, body: geoCache.get(q), cache: 'HIT' };
+  const endpoint = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q);
+  try {
+    const r = await fetchImpl(endpoint, { headers: { 'user-agent': GEO_UA, accept: 'application/json', 'accept-language': 'zh-TW' }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return { code: 502, body: { error: '地理編碼失敗' } };
+    const arr = await r.json();
+    const hit = Array.isArray(arr) ? arr[0] : null;
+    const lat = hit ? Number(hit.lat) : NaN;
+    const lng = hit ? Number(hit.lon) : NaN;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { code: 404, body: { error: '找不到座標' } };
+    const body = { lat, lng };
+    geoCache.set(q, body);
+    return { code: 200, body, cache: 'MISS' };
+  } catch (e) {
+    return { code: 502, body: { error: '地理編碼失敗：' + (e?.message || 'unknown') } };
+  }
+}
+
 export function createServer({ fetchImpl = fetch, allowOrigin = process.env.ALLOW_ORIGIN || '*' } = {}) {
   return http.createServer(async (req, res) => {
     const cors = { 'access-control-allow-origin': allowOrigin, 'access-control-allow-methods': 'GET, OPTIONS', 'cache-control': 'no-store' };
@@ -61,6 +85,12 @@ export function createServer({ fetchImpl = fetch, allowOrigin = process.env.ALLO
     if (req.method === 'GET' && url.pathname === '/meta') {
       const { code, body } = await fetchMeta(url.searchParams.get('url') || '', fetchImpl);
       return send(code, body);
+    }
+    if (req.method === 'GET' && url.pathname === '/geo') {
+      const { code, body, cache } = await fetchGeo(url.searchParams.get('q') || '', fetchImpl);
+      res.writeHead(code, { ...cors, 'content-type': 'application/json; charset=utf-8', 'cache-control': code === 200 ? 'public, max-age=86400' : 'no-store', 'x-geo-cache': cache || 'NONE' });
+      res.end(JSON.stringify(body));
+      return;
     }
     send(404, { error: 'not found' });
   });

@@ -32,6 +32,7 @@ export function ConfirmAddSheet({ draft, onChange, onCancel, onConfirm }: { draf
       {draft.caption ? <p className="caption">{draft.caption}</p> : null}
       <Field label="名稱" value={draft.name} onChange={(name) => onChange({ name })} />
       <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="讀不到店名就留白" />
+      <Field label="地址" value={draft.address} onChange={(address) => onChange({ address })} placeholder="沒有寫地址就留白" />
       <div className="label">分類</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填，已預填，請確認）</div>
@@ -63,6 +64,7 @@ export function ManualSheet({ draft, reason, onChange, onCancel, onSave }: { dra
       <div className="tags"><span className="muted">來源</span><SourceTag source={draft.source} /><span className="muted small">{shortUrl(draft.url)}</span></div>
       <Field label="名稱" required value={draft.name} onChange={(name) => onChange({ name })} placeholder="例如：大稻埕拉麵" />
       <Field label="店家名稱" value={draft.placeName} onChange={(placeName) => onChange({ placeName })} placeholder="沒有可靠店名就留白" />
+      <Field label="地址" value={draft.address} onChange={(address) => onChange({ address })} placeholder="沒有寫地址就留白" />
       <Field label="說明" value={draft.caption} onChange={(caption) => onChange({ caption })} placeholder="這則貼文在說什麼？" multiline />
       <Field label="帳號" required value={draft.handle} onChange={(handle) => onChange({ handle: handle.replace(/^@/, '').trim() })} placeholder="例如：aming.ramen" />
       <div className="label">分類（必填）</div>
@@ -198,6 +200,8 @@ export function SettingsSheet({ settings, storeKind, usage, onChange, onClose }:
           <span><span className="strong">中繼資料代理（外掛）</span><br /><span className="muted small">預設開啟。只有在裝置直接讀不到貼文時，才會把貼文網址送到下方代理以取得標題與縮圖。可以隨時關掉；關掉後完全不會向代理送出請求，讀不到時改走手動補充。私人貼文代理也讀不到，一樣請手動補充。</span></span>
         </label>
         <Field label="代理網址" value={settings.proxyUrl} onChange={(proxyUrl) => onChange({ ...settings, proxyUrl })} placeholder={DEFAULT_PROXY_URL} inputMode="url" />
+        <Field label="住家地址" value={settings.homeAddress} onChange={(homeAddress) => onChange({ ...settings, homeAddress, homeLat: undefined, homeLng: undefined })} placeholder="新北市林口區仁愛二路96號" />
+        <div className="hint">距離和導航從這裡出發。預設是林口的住家，可以改。</div>
       </div>
       <div className="setting">
         <div className="strong">資料存放位置</div>

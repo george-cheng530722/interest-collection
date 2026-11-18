@@ -1,4 +1,4 @@
-import type { Category, City, Source } from './types';
+import type { Category, City, Item, Source } from './types';
 import { DEFAULT_CITY } from './constants';
 
 const URL_RE = /https?:\/\/[^\s<>"'（）「」『』，。、！？]+/gi;
@@ -89,6 +89,24 @@ export function postIdentity(raw: string): string | null {
     return id ? 'x:' + id : null;
   }
   return null;
+}
+
+/** 同一則貼文的比對鍵：有貼文編號就用編號，否則用整理過的網址。 */
+export function itemUrlKey(url: string): string {
+  return postIdentity(url) || normalizeUrl(url).replace(/\/+$/, '').toLowerCase();
+}
+
+/** 已經收進清單、網址或貼文編號相同的項目，兩則以上才算一組。 */
+export function duplicateGroups(items: Item[]): Item[][] {
+  const map = new Map<string, Item[]>();
+  for (const it of items) {
+    const key = itemUrlKey(it.url);
+    if (!key) continue;
+    const list = map.get(key);
+    if (list) list.push(it);
+    else map.set(key, [it]);
+  }
+  return [...map.values()].filter((g) => g.length > 1);
 }
 
 export function sameUrl(a: string, b: string): boolean {

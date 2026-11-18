@@ -3,7 +3,8 @@ import type { Item } from '../lib/types';
 import { CATEGORIES } from '../lib/constants';
 import { itemName } from '../lib/share';
 import { cardBlurb } from '../lib/place';
-import { Btn, categoryTone, Chip, CitySelect, Field, SourceTag, Stars, Tag, Thumb } from './ui';
+import type { Settings } from '../lib/types';
+import { Btn, categoryTone, Chip, CitySelect, Field, PlaceNav, SourceTag, Stars, Tag, Thumb } from './ui';
 
 export interface DetailActions {
   back: () => void;
@@ -20,18 +21,20 @@ function openLabel(item: Item): string {
   return item.source === 'Instagram' ? '在 Instagram 開啟' : item.source === 'Threads' ? '在 Threads 開啟' : '在 X 開啟';
 }
 
-export function Detail({ item, justAdded, checking, actions }: { item: Item; justAdded: boolean; checking: boolean; actions: DetailActions }) {
+export function Detail({ item, justAdded, checking, actions, duplicate, home }: { item: Item; justAdded: boolean; checking: boolean; actions: DetailActions; duplicate?: boolean; home?: Pick<Settings, 'homeAddress' | 'homeLat' | 'homeLng'> }) {
   const [memo, setMemo] = useState(item.memo);
   const [review, setReview] = useState(item.review);
   const [place, setPlace] = useState(item.placeName || '');
+  const [address, setAddress] = useState(item.address || '');
   const [captionOpen, setCaptionOpen] = useState(false);
   const [saved, setSaved] = useState('');
   // 打開時的地區：若是舊資料或自訂值，改選別的地區後仍可在下拉選單選回來
   const [originalCity, setOriginalCity] = useState(item.city);
-  useEffect(() => { setMemo(item.memo); setReview(item.review); setPlace(item.placeName || ''); setCaptionOpen(false); setSaved(''); setOriginalCity(item.city); }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setMemo(item.memo); setReview(item.review); setPlace(item.placeName || ''); setAddress(item.address || ''); setCaptionOpen(false); setSaved(''); setOriginalCity(item.city); }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const memoDirty = memo !== item.memo;
   const reviewDirty = review !== item.review;
   const placeDirty = place.trim() !== (item.placeName || '');
+  const addressDirty = address.trim() !== (item.address || '');
   const full = item.caption || '';
   const brief = cardBlurb(item);
   const canExpand = full.trim().length > brief.trim().length;
@@ -55,6 +58,7 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
             <Tag tone={item.status === '已完成' ? 'success' : 'warning'}>{item.status}</Tag>
             {item.manual ? <Tag tone="accent">手動補充</Tag> : null}
             {item.linkDead ? <Tag tone="danger">連結失效</Tag> : null}
+            {duplicate ? <Tag tone="danger">重複</Tag> : null}
           </div>
         </div>
         {full.trim() ? (
@@ -63,6 +67,7 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
             {canExpand ? <button type="button" className="text-btn" onClick={() => setCaptionOpen((v) => !v)}>{captionOpen ? '收合簡介' : '展開全文'}</button> : null}
           </div>
         ) : null}
+        <PlaceNav item={item} home={home} />
         <dl className="kv">
           <dt>連結</dt><dd><a className="link" href={item.url} target="_blank" rel="noopener noreferrer" data-testid="detail-url">{item.url}</a></dd>
         </dl>
@@ -99,7 +104,9 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
         )}
 
         <Field label="店家名稱" value={place} onChange={(v) => { setPlace(v); setSaved(''); }} placeholder="沒有可靠店名就留白" />
-        {placeDirty ? <div className="row"><Btn label="儲存店家名稱" primary onClick={() => { actions.patch({ placeName: place.trim() }); setPlace(place.trim()); setSaved('店家名稱已儲存'); }} block /></div> : null}
+        {placeDirty ? <div className="row"><Btn label="儲存店家名稱" primary onClick={() => { actions.patch({ placeName: place.trim(), lat: undefined, lng: undefined, geoState: undefined }); setPlace(place.trim()); setSaved('店家名稱已儲存'); }} block /></div> : null}
+        <Field label="地址" value={address} onChange={(v) => { setAddress(v); setSaved(''); }} placeholder="沒有寫地址就留白" />
+        {addressDirty ? <div className="row"><Btn label="儲存地址" primary onClick={() => { actions.patch({ address: address.trim(), lat: undefined, lng: undefined, geoState: undefined }); setAddress(address.trim()); setSaved('地址已儲存'); }} block /></div> : null}
         <Field label="備註" value={memo} onChange={(v) => { setMemo(v); setSaved(''); }} placeholder="例如：週末帶爸媽去、先問營業時間" multiline />
         <div className="row"><Btn label="儲存備註" primary={memoDirty} disabled={!memoDirty} onClick={() => { actions.patch({ memo }); setSaved('備註已儲存'); }} block /></div>
         {saved ? <div className="ok" role="status">{saved}</div> : null}

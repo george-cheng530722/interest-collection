@@ -4,7 +4,8 @@ import { CATEGORIES, CITIES, SOURCES, APP_NAME, isKnownCity } from '../lib/const
 import { itemName } from '../lib/share';
 import { cardBlurb } from '../lib/place';
 import { shortUrl } from '../lib/parse';
-import { BrandMark, Btn, categoryTone, Chip, EmptyMark, SourceTag, Stars, Tag, Thumb } from './ui';
+import type { Settings } from '../lib/types';
+import { BrandMark, Btn, categoryTone, Chip, EmptyMark, PlaceNav, SourceTag, Stars, Tag, Thumb } from './ui';
 
 /** '全部' 代表不篩選。city 可能是 CITIES 以外的舊資料或自訂地區 */
 export interface Filters { tab: ItemStatus; source: Source | '全部'; category: Category | '全部'; city: City | (string & {}) | '全部' }
@@ -13,6 +14,11 @@ export function applyFilters(items: Item[], f: Filters): Item[] {
   return items
     .filter((it) => it.status === f.tab && (f.source === '全部' || it.source === f.source) && (f.category === '全部' || it.category === f.category) && (f.city === '全部' || it.city === f.city))
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** 分類數量用跟清單完全相同的條件（含目前的狀態、來源、地區），只把分類換成這一顆。 */
+export function categoryCount(items: Item[], f: Filters, category: Category): number {
+  return applyFilters(items, { ...f, category }).length;
 }
 
 function dateLabel(t: number): string {
@@ -25,6 +31,8 @@ export function ListView(props: {
   input: string; setInput: (s: string) => void; loading: boolean; notice: string; online: boolean; storageWarning: string;
   onAdd: () => void; onShareList: () => void; onExport: () => void; onSettings: () => void;
   onOpen: (id: string) => void; onShareItem: (it: Item) => void; onThumbBroken: (id: string) => void;
+  duplicateIds?: string[]; duplicateGroups?: number; onReviewDuplicates?: () => void;
+  home?: Pick<Settings, 'homeAddress' | 'homeLat' | 'homeLng'>;
 }) {
   const { items, visible, filters: f, setFilters } = props;
   const inTab = items.filter((it) => it.status === f.tab);
@@ -58,21 +66,22 @@ export function ListView(props: {
         {props.notice ? <div className="notice-text" role="status">{props.notice}</div> : null}
       </form>
       <nav className="chip-row" aria-label="清單">
-        <Chip label="想體驗" count={items.filter((i) => i.status === '想體驗').length} active={f.tab === '想體驗'} onClick={() => set({ tab: '想體驗' })} />
-        <Chip label="已完成" count={items.filter((i) => i.status === '已完成').length} active={f.tab === '已完成'} onClick={() => set({ tab: '已完成' })} />
+        <Chip label="想體驗" active={f.tab === '想體驗'} onClick={() => set({ tab: '想體驗' })} />
+        <Chip label="已完成" active={f.tab === '已完成'} onClick={() => set({ tab: '已完成' })} />
       </nav>
       <div className="chip-row" role="group" aria-label="來源篩選">
         <Chip label="來源" active={f.source === '全部'} onClick={() => set({ source: '全部' })} />
-        {SOURCES.map((s) => <Chip key={s} tone={s === 'Instagram' ? 'ig' : s === 'Threads' ? 'threads' : 'x'} label={s} count={inTab.filter((i) => i.source === s).length} active={f.source === s} onClick={() => set({ source: s })} />)}
+        {SOURCES.map((s) => <Chip key={s} tone={s === 'Instagram' ? 'ig' : s === 'Threads' ? 'threads' : 'x'} label={s} active={f.source === s} onClick={() => set({ source: s })} />)}
       </div>
       <div className="chip-row" role="group" aria-label="分類篩選">
-        <Chip label="分類" count={inTab.length} active={f.category === '全部'} onClick={() => set({ category: '全部' })} />
-        {CATEGORIES.map((c) => <Chip key={c} tone={categoryTone(c)} label={c} count={inTab.filter((i) => i.category === c).length} active={f.category === c} onClick={() => set({ category: c })} />)}
+        <Chip label="分類" active={f.category === '全部'} onClick={() => set({ category: '全部' })} />
+        {CATEGORIES.map((c) => <Chip key={c} tone={categoryTone(c)} label={c} count={categoryCount(items, f, c)} active={f.category === c} onClick={() => set({ category: c })} />)}
       </div>
       <div className="chip-row" role="group" aria-label="地區篩選">
         <Chip label="地區" active={f.city === '全部'} onClick={() => set({ city: '全部' })} />
-        {usedCities.map((c) => <Chip key={c} tone="region" label={c} count={inTab.filter((i) => i.city === c).length} active={f.city === c} onClick={() => set({ city: c })} />)}
+        {usedCities.map((c) => <Chip key={c} tone="region" label={c} active={f.city === c} onClick={() => set({ city: c })} />)}
       </div>
+      {props.duplicateGroups ? <button type="button" className="dup-banner" onClick={props.onReviewDuplicates}>有 {props.duplicateGroups} 組重複收藏</button> : null}
       <main className="scroll pad-x" aria-label="收藏清單">
         {props.loading ? <div className="card muted" role="status">正在讀取貼文資訊…</div> : null}
         {visible.length === 0 && !props.loading ? (
@@ -85,6 +94,7 @@ export function ListView(props: {
             const title = itemName(it);
             const place = it.placeName?.trim() ?? '';
             const blurb = cardBlurb(it);
+            const duplicated = props.duplicateIds?.includes(it.id);
             return (
             <li key={it.id} style={{ '--i': Math.min(index, 8) } as CSSProperties}>
               <div className="card" role="button" tabIndex={0} data-testid="item-card" aria-label={title} onClick={() => props.onOpen(it.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); props.onOpen(it.id); } }}>
@@ -94,6 +104,7 @@ export function ListView(props: {
                   <div className="card-top"><span className="strong ellipsis" data-testid="item-name">{title}</span><span className="muted tiny">{dateLabel(it.createdAt)}</span></div>
                   <div className="muted small">@{it.handle}</div>
                   {blurb ? <div className="clamp3" data-testid="item-summary">{blurb}</div> : null}
+                  <PlaceNav item={it} home={props.home} />
                   <div className="tags">
                     <SourceTag source={it.source} />
                     <Tag tone="accent">{it.category}</Tag>
@@ -101,6 +112,7 @@ export function ListView(props: {
                     <Tag tone={it.status === '已完成' ? 'success' : 'warning'}>{it.status}</Tag>
                     {it.manual ? <Tag tone="accent">手動補充</Tag> : null}
                     {it.linkDead ? <Tag tone="danger">連結失效</Tag> : null}
+                    {duplicated ? <Tag tone="danger">重複</Tag> : null}
                   </div>
                   {it.status === '已完成' && it.rating > 0 ? <Stars value={it.rating} /> : null}
                   {it.memo ? <div className="muted tiny ellipsis">備註：{it.memo}</div> : null}

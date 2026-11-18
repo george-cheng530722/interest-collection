@@ -51,8 +51,7 @@ h1, h2, p { margin: 0; }
 .topbar .btn { background: rgba(255, 250, 246, .12); color: var(--cream); }
 .topbar .btn:active { background: rgba(255, 250, 246, .2); }
 .brand { display: flex; align-items: center; gap: var(--s3); flex: 1; min-width: 0; }
-.brand-mark { display: block; flex-shrink: 0; color: var(--header); border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, .18); }
-.topbar .brand-mark { color: #241812; }
+.brand-mark { display: block; flex-shrink: 0; width: 48px; height: 48px; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .28)); }
 .brand-copy { min-width: 0; }
 .brand-kicker { margin: 1px 0 0; font-size: 11px; letter-spacing: .14em; color: color-mix(in srgb, var(--cream) 72%, transparent); font-weight: 500; }
 .app-title { font-size: 1.2rem; font-weight: 650; letter-spacing: -0.03em; line-height: 1.15; color: var(--cream); }
@@ -189,6 +188,19 @@ span.star { font-size: 16px; cursor: default; }
 .actions { margin-top: var(--s5); }
 .confirm-head { display: flex; gap: var(--s3); align-items: center; }
 .dup-card { margin: var(--s3) 0; padding: var(--s3) var(--s4); border-radius: var(--radius); background: var(--subtle); }
+.dup-banner {
+  display: block; width: calc(100% - 2 * var(--s4)); margin: 0 var(--s4) var(--s3);
+  margin-left: calc(var(--s4) + env(safe-area-inset-left)); margin-right: calc(var(--s4) + env(safe-area-inset-right));
+  border: none; border-radius: 12px; background: var(--warn-bg); color: var(--text);
+  font: inherit; font-weight: 650; text-align: left; padding: 12px 14px; min-height: 44px; cursor: pointer;
+}
+.dup-row { display: flex; gap: var(--s3); align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+.dup-row .grow { display: flex; flex-direction: column; align-items: flex-start; }
+.dup-keep { background: color-mix(in srgb, var(--ok) 8%, transparent); border-radius: 10px; padding-left: 8px; padding-right: 8px; }
+.place-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.place-nav-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.distance { font-size: 13px; font-weight: 650; color: var(--primary); }
+.map-link { font-size: 13px; font-weight: 650; color: var(--accent); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(28, 18, 12, .46); display: flex; flex-direction: column; justify-content: flex-end; }
 .sheet-dismiss { flex: 1; border: none; background: transparent; min-height: 40px; }
 .sheet {

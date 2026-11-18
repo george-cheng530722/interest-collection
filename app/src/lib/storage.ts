@@ -1,7 +1,7 @@
 import type { Item, Settings } from './types';
 import { DEFAULT_PROXY_URL, DEFAULT_SETTINGS } from './types';
 import { canonicalCity, DEMO_ITEM_IDS, DEMO_ITEM_URLS } from './constants';
-import { extractPlaceName, shortSummary } from './place';
+import { extractAddress, extractPlaceName, shortSummary } from './place';
 import { sameUrl } from './parse';
 
 export type StoreKind = 'indexeddb' | 'localstorage' | 'memory';
@@ -176,8 +176,13 @@ export async function loadSettings(store: Store): Promise<Settings> {
 export async function migratePlaceAndSummary(store: Store): Promise<void> {
   const items = await store.getItems();
   for (const it of items) {
-    const raw = it as Item & { placeName?: unknown; summary?: unknown };
-    const next: Item = { ...it, placeName: typeof raw.placeName === 'string' ? raw.placeName : '', summary: typeof raw.summary === 'string' ? raw.summary : '' };
+    const raw = it as Item & { placeName?: unknown; summary?: unknown; address?: unknown };
+    const next: Item = {
+      ...it,
+      placeName: typeof raw.placeName === 'string' ? raw.placeName : '',
+      summary: typeof raw.summary === 'string' ? raw.summary : '',
+      address: typeof raw.address === 'string' ? raw.address : '',
+    };
     let changed = false;
     if (typeof raw.placeName !== 'string') {
       next.placeName = extractPlaceName(it.name || '', it.caption || '');
@@ -185,6 +190,10 @@ export async function migratePlaceAndSummary(store: Store): Promise<void> {
     }
     if (typeof raw.summary !== 'string') {
       next.summary = shortSummary(it.caption || '');
+      changed = true;
+    }
+    if (typeof raw.address !== 'string') {
+      next.address = extractAddress(it.caption || '');
       changed = true;
     }
     if (changed) await store.putItem(next);

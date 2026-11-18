@@ -83,7 +83,7 @@ describe('抓取流程：直接 → 公開 oEmbed → 代理（只在開啟時�
     expect(f).not.toHaveBeenCalled();
   });
   it('代理預設開啟（Cloudflare Worker）：直接與 oEmbed 失敗後才請求並採用結果；關掉就絕不請求', async () => {
-    expect(DEFAULT_SETTINGS).toEqual({ proxyEnabled: true, proxyUrl: 'https://interest-collection-proxy.george-cheng.workers.dev' });
+    expect(DEFAULT_SETTINGS).toEqual({ proxyEnabled: true, proxyUrl: 'https://interest-collection-proxy.george-cheng.workers.dev', homeAddress: '新北市林口區仁愛二路96號' });
     expect(DEFAULT_PROXY_URL).toBe(DEFAULT_SETTINGS.proxyUrl);
     const f = vi.fn(async (u: RequestInfo | URL) => {
       if (String(u).startsWith(PROXY_META)) return new Response(JSON.stringify({ status: 200, title: 'National Geographic 在 Instagram: "manatee"', description: '', image: 'https://cdn/x.jpg' }));

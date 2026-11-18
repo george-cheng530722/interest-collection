@@ -20,6 +20,12 @@ export interface Item {
   caption: string;
   /** 卡片與收合時用的短簡介，最多約 120 字，在句號或換行處截斷 */
   summary: string;
+  /** 貼文或使用者寫明的地址。沒有就空字串，不猜。 */
+  address: string;
+  /** 地理編碼結果。失敗不填座標。 */
+  lat?: number;
+  lng?: number;
+  geoState?: 'ok' | 'failed';
   category: Category | '';
   /** 通常是 City；舊版正式名稱以外的自訂值原樣保留；'' 表示尚未選擇 */
   city: City | (string & {});
@@ -48,12 +54,19 @@ export interface Item {
 export interface Settings {
   proxyEnabled: boolean;
   proxyUrl: string;
+  /** 距離與導航的出發點。預設是林口住家，可在設定裡改。 */
+  homeAddress: string;
+  homeLat?: number;
+  homeLng?: number;
 }
 
 /** 已部署的 Cloudflare Worker 中繼資料代理 */
 export const DEFAULT_PROXY_URL = 'https://interest-collection-proxy.george-cheng.workers.dev';
 
+export const DEFAULT_HOME_ADDRESS = '新北市林口區仁愛二路96號';
+
 export const DEFAULT_SETTINGS: Settings = {
   proxyEnabled: true,
   proxyUrl: DEFAULT_PROXY_URL,
+  homeAddress: DEFAULT_HOME_ADDRESS,
 };

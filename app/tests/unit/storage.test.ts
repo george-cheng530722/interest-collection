@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { idbStore, isKnownDemoItem, isLegacyProxyUrl, loadSettings, localStore, memoryStore, migrateLegacyCities, migratePlaceAndSummary, openIdb, removeStoredDemoItems, saveSettings, StorageFullError } from '../../src/lib/storage';
-import { DEFAULT_PROXY_URL, type Item, type Settings } from '../../src/lib/types';
+import { DEFAULT_HOME_ADDRESS, DEFAULT_PROXY_URL, DEFAULT_SETTINGS, type Item, type Settings } from '../../src/lib/types';
 import { makeItem } from '../helpers';
 
 describe('本機儲存', () => {
@@ -35,8 +35,8 @@ describe('本機儲存', () => {
     await s.putItem(makeItem({ id: 'a', name: 'A', screenshot: 'data:image/jpeg;base64,AAAA' }));
     await s.putItem({ ...makeItem({ id: 'a', name: 'A2' }) });
     expect((await localStore().getItems()).map((i) => i.name)).toEqual(['A2']);
-    await saveSettings(s, { proxyEnabled: true, proxyUrl: 'https://proxy.example.com' });
-    expect(await loadSettings(localStore())).toEqual({ proxyEnabled: true, proxyUrl: 'https://proxy.example.com' });
+    await saveSettings(s, { ...DEFAULT_SETTINGS, proxyUrl: 'https://proxy.example.com' });
+    expect(await loadSettings(localStore())).toEqual({ ...DEFAULT_SETTINGS, proxyUrl: 'https://proxy.example.com' });
     await s.deleteItem('a');
     expect(await localStore().getItems()).toHaveLength(0);
   });
@@ -47,31 +47,31 @@ describe('本機儲存', () => {
   });
 
   it('設定預設：沒有存過設定 → 代理開啟，使用 Worker 網址', async () => {
-    expect(await loadSettings(memoryStore())).toEqual({ proxyEnabled: true, proxyUrl: 'https://interest-collection-proxy.george-cheng.workers.dev' });
+    expect(await loadSettings(memoryStore())).toEqual(DEFAULT_SETTINGS);
   });
 
   it('舊設定是 localhost／127.0.0.1／空白 → 改成 Worker 網址、開啟，並寫回', async () => {
     for (const legacy of ['http://localhost:8787', 'https://localhost', 'localhost:3000', 'http://127.0.0.1:8787/', '127.0.0.1', '', '   ']) {
       const s = memoryStore();
-      await s.setKv<Settings>('settings', { proxyEnabled: false, proxyUrl: legacy });
-      const want = { proxyEnabled: true, proxyUrl: DEFAULT_PROXY_URL };
+      await s.setKv<Partial<Settings>>('settings', { proxyEnabled: false, proxyUrl: legacy });
+      const want = { proxyEnabled: true, proxyUrl: DEFAULT_PROXY_URL, homeAddress: DEFAULT_HOME_ADDRESS };
       expect(await loadSettings(s)).toEqual(want);
       expect(await s.getKv('settings')).toEqual(want);
     }
     const missing = memoryStore();
     await missing.setKv('settings', { proxyEnabled: false });
-    expect(await loadSettings(missing)).toEqual({ proxyEnabled: true, proxyUrl: DEFAULT_PROXY_URL });
+    expect(await loadSettings(missing)).toEqual({ proxyEnabled: true, proxyUrl: DEFAULT_PROXY_URL, homeAddress: DEFAULT_HOME_ADDRESS });
     expect(isLegacyProxyUrl('https://localhost.example.com')).toBe(false);
   });
 
   it('使用者自己存的非本機代理網址（即使關閉）不會被改動', async () => {
     const s = memoryStore();
     const mine = { proxyEnabled: false, proxyUrl: 'https://my-proxy.example.workers.dev' };
-    await s.setKv<Settings>('settings', mine);
-    expect(await loadSettings(s)).toEqual(mine);
+    await s.setKv<Partial<Settings>>('settings', mine);
+    expect(await loadSettings(s)).toEqual({ ...DEFAULT_SETTINGS, ...mine });
     expect(await s.getKv('settings')).toEqual(mine);
-    await s.setKv<Settings>('settings', { proxyEnabled: false, proxyUrl: DEFAULT_PROXY_URL });
-    expect(await loadSettings(s)).toEqual({ proxyEnabled: false, proxyUrl: DEFAULT_PROXY_URL });
+    await s.setKv<Partial<Settings>>('settings', { proxyEnabled: false, proxyUrl: DEFAULT_PROXY_URL });
+    expect(await loadSettings(s)).toEqual({ ...DEFAULT_SETTINGS, proxyEnabled: false });
   });
 
   it('舊地區名稱（台北市…）轉成新名稱並寫回；自訂地區原樣保留', async () => {

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Item, Settings } from './lib/types';
 import { DEFAULT_SETTINGS } from './lib/types';
 import { DEFAULT_CITY, defaultEmoji } from './lib/constants';
-import { classify, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
-import { extractPlaceName, shortSummary } from './lib/place';
+import { classify, duplicateGroups, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
+import { extractAddress, extractPlaceName, shortSummary } from './lib/place';
+import { geocodePlace } from './lib/geo';
 import { failMessage, fetchPostMeta, type FailReason } from './lib/fetchMeta';
 import { isThumbExpired, refreshThumb } from './lib/thumbs';
 import { loadSettings, migrateLegacyCities, migratePlaceAndSummary, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
@@ -12,6 +13,7 @@ import { applyFilters, ListView, type Filters } from './components/ListView';
 import { Detail } from './components/Detail';
 import { ConfirmAddSheet, DeadLinkSheet, DeleteSheet, DuplicateSheet, ExportSheet, ManualSheet, ReviewSheet, SettingsSheet, ShareSheet } from './components/sheets';
 import { BrandMark } from './components/ui';
+import { DuplicateReview } from './components/DuplicateReview';
 
 export interface AppProps {
   store: Store;
@@ -31,7 +33,7 @@ function blankItem(url: string, p: Partial<Item>): Item {
   const now = Date.now();
   const { source, handle } = parseUrlMeta(url);
   return {
-    id: newId(), source: source ?? 'Instagram', url, handle, name: '', placeName: '', caption: '', summary: '', category: '', city: DEFAULT_CITY,
+    id: newId(), source: source ?? 'Instagram', url, handle, name: '', placeName: '', caption: '', summary: '', address: '', category: '', city: DEFAULT_CITY,
     status: '想體驗', memo: '', rating: 0, review: '', manual: false, linkDead: false, thumbState: 'ok',
     emoji: '✨', createdAt: now, updatedAt: now, fetchedVia: 'manual', ...p,
   };
@@ -66,6 +68,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState('');
   const [dupPrompt, setDupPrompt] = useState<{ item: Item; onOpen: () => void; onCancel: () => void; onSaveAnyway: () => void } | null>(null);
+  const [dupReview, setDupReview] = useState(false);
   const attempted = useRef(new Set<string>());
   const sharedHandled = useRef(false);
   const dupBypass = useRef<string | null>(null);
@@ -222,7 +225,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
       const basis = `${m.name} ${caption}`;
       const category = classify(basis);
       setPending(blankItem(url, {
-        name: m.name, placeName: extractPlaceName(m.name, caption), caption, summary: shortSummary(caption),
+        name: m.name, placeName: extractPlaceName(m.name, caption), caption, summary: shortSummary(caption), address: extractAddress(caption),
         handle: m.handle || parseUrlMeta(url).handle, category, city: inferCity(basis),
         emoji: defaultEmoji(category), thumbUrl: m.image, thumbExpiresAt: thumbExpiryFromUrl(m.image), fetchedVia: res.via,
       }));
@@ -243,6 +246,8 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
 
   // ---- 衍生資料 ----
   const visible = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const dupGroups = useMemo(() => duplicateGroups(items), [items]);
+  const dupIds = useMemo(() => dupGroups.flat().map((it) => it.id), [dupGroups]);
   const openItem = items.find((x) => x.id === openId) ?? null;
   const byId = (id: string | null) => (id ? items.find((x) => x.id === id) ?? null : null);
   const deleteItem = byId(deleteFor);
@@ -274,16 +279,49 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     setUsage(e && e.quota ? `已用約 ${(e.usage / 1024 / 1024).toFixed(1)} MB／可用約 ${(e.quota / 1024 / 1024).toFixed(0)} MB` : '');
   };
 
+  useEffect(() => {
+    if (!loaded || !online || !settings.proxyEnabled) return;
+    let cancel = false;
+    const run = async () => {
+      const proxy = settingsRef.current.proxyUrl;
+      if (settings.homeAddress.trim() && (settings.homeLat == null || settings.homeLng == null)) {
+        const home = await geocodePlace(settings.homeAddress, proxy);
+        if (cancel || home === 'unsupported') return;
+        if (home) {
+          const next = { ...settingsRef.current, homeLat: home.lat, homeLng: home.lng };
+          settingsRef.current = next;
+          setSettings(next);
+          void saveSettings(store, next).catch(reportStorageError);
+        }
+      }
+      for (const it of itemsRef.current) {
+        if (cancel) return;
+        const q = (it.address || '').trim() || (it.placeName || '').trim();
+        if (!q || it.geoState === 'ok' || it.geoState === 'failed' || (it.lat != null && it.lng != null)) continue;
+        const g = await geocodePlace(q, proxy);
+        if (cancel) return;
+        if (g === 'unsupported') return;
+        if (g) patchItem(it.id, { lat: g.lat, lng: g.lng, geoState: 'ok' });
+        else patchItem(it.id, { geoState: 'failed' });
+      }
+    };
+    void run();
+    return () => { cancel = true; };
+  }, [loaded, online, settings.proxyEnabled, settings.proxyUrl, settings.homeAddress, settings.homeLat, settings.homeLng, items.length, store, patchItem, reportStorageError]);
+
   if (!loaded) return <div className="screen center-col loading-screen"><BrandMark /><p className="muted">載入中…</p></div>;
 
+  const homePick = { homeAddress: settings.homeAddress, homeLat: settings.homeLat, homeLng: settings.homeLng };
   return (
     <div className="app">
-      {openItem ? (
+      {dupReview ? <DuplicateReview groups={dupGroups} onBack={() => setDupReview(false)} onDelete={(ids) => { ids.forEach((id) => void removeItem(id)); }} /> : openItem ? (
         <Detail
           key={openItem.id}
           item={openItem}
           justAdded={justAddedId === openItem.id}
           checking={checking}
+          duplicate={dupIds.includes(openItem.id)}
+          home={homePick}
           actions={{
             back: () => { setFilters((f) => ({ ...f, tab: openItem.status })); setOpenId(null); },
             patch: (p) => patchItem(openItem.id, p),
@@ -304,6 +342,8 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
           onExport={() => setExportOpen(true)} onSettings={() => void openSettings()}
           onOpen={(id) => setOpenId(id)} onShareItem={(it) => setShare({ title: '分享給 LINE 好友', text: shareItemText(it), url: it.url })}
           onThumbBroken={onThumbBroken}
+          duplicateIds={dupIds} duplicateGroups={dupGroups.length} onReviewDuplicates={() => { setToast(''); setDupReview(true); }}
+          home={homePick}
         />
       )}
 
@@ -322,7 +362,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
         if (!d.name.trim() || !d.handle.trim() || !d.category || !d.city) return;
         const save = () => {
           const caption = d.caption.trim();
-          insertItem({ ...d, name: d.name.trim(), placeName: d.placeName.trim(), caption, summary: shortSummary(caption), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
+          insertItem({ ...d, name: d.name.trim(), placeName: d.placeName.trim(), address: d.address.trim(), caption, summary: shortSummary(caption), handle: d.handle.replace(/^@/, '').trim(), manual: true, fetchedVia: 'manual', linkDead: manual.reason === 'dead', createdAt: Date.now(), updatedAt: Date.now() });
           setManual(null);
         };
         if (askDuplicate(d.url, save)) return;

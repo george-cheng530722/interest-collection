@@ -25,20 +25,24 @@ function png(size, pixel) {
   ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
-// 深色底滿版（maskable 安全區內放書籤＋淡金星），與畫面標記同一造型
+// 深色底滿版，中央金色皇冠（上亮下深），maskable 安全區內
 function pixel(u, v) {
   const bg = [44, 33, 28, 255];
-  const cream = [246, 241, 234, 255];
-  const gold = [196, 165, 116, 255];
-  const inX = u >= 0.34 && u <= 0.66;
-  const notch = v > 0.64 && Math.abs(u - 0.5) < (v - 0.64) * 0.9;
-  if (inX && v >= 0.24 && v <= 0.76 && !notch) {
-    const cx = u - 0.5, cy = v - 0.42;
-    const r = Math.hypot(cx, cy);
-    const t = Math.atan2(cy, cx) + Math.PI / 2;
-    const k = Math.cos(5 * t) * 0.5 + 0.5;
-    if (r < 0.045 + 0.045 * k) return gold;
-    return cream;
+  const shade = Math.max(0, Math.min(1, (v - 0.12) / 0.7));
+  const gold = [Math.round(255 - shade * 90), Math.round(230 - shade * 110), Math.round(170 - shade * 120), 255];
+  const jewel = [255, 248, 230, 255];
+  const peaks = [[0.28, 0.16], [0.5, 0.12], [0.72, 0.16]];
+  let crown = false;
+  if (u >= 0.18 && u <= 0.82 && v >= 0.62 && v <= 0.78) crown = true;
+  for (const [px, py] of peaks) {
+    if (v >= py && v <= 0.64) {
+      const t = (v - py) / (0.64 - py);
+      if (Math.abs(u - px) <= 0.16 * t) crown = true;
+    }
+  }
+  if (crown) {
+    for (const [px, py] of peaks) if (Math.hypot(u - px, v - py) < 0.035) return jewel;
+    return gold;
   }
   return bg;
 }

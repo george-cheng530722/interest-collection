@@ -93,7 +93,7 @@ self.addEventListener('fetch', (event) => {
 
 /** 單檔版：拿掉 manifest／圖示連結（file:// 讀不到外部檔），並把輸出改名 */
 function singleFileHtml(): Plugin {
-  const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='14' fill='%232c211c'/%3E%3Cpath d='M16.5 11.5h15v23.2l-7.5-4.7-7.5 4.7V11.5z' fill='%23F6F1EA'/%3E%3Cpath d='M24 16.2l1.05 2.2 2.4.32-1.76 1.66.44 2.38L24 21.6l-2.13 1.16.44-2.38-1.76-1.66 2.4-.32L24 16.2z' fill='%23C4A574'/%3E%3C/svg%3E";
+  const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232c211c'/%3E%3Cpath fill='%23E8C872' d='M10 44 16 20l12 14L32 8l4 26 12-14 6 24z'/%3E%3Crect x='8' y='44' width='48' height='9' rx='2' fill='%23C6A04A'/%3E%3C/svg%3E";
   return {
     name: 'gic-single-html',
     apply: 'build',

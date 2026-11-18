@@ -30,7 +30,7 @@ export function jsonResponse(obj: unknown, status = 200): Response {
 
 export function makeItem(p: Partial<Item> & Pick<Item, 'id' | 'name'>): Item {
   return {
-    source: 'Instagram', url: `https://www.instagram.com/p/${p.id}/`, handle: 'tester', caption: '', category: '吃', city: '台北市',
+    source: 'Instagram', url: `https://www.instagram.com/p/${p.id}/`, handle: 'tester', caption: '', category: '吃', city: '台北',
     status: '想體驗', memo: '', rating: 0, review: '', manual: false, linkDead: false, thumbState: 'ok', emoji: '🍜',
     createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000, fetchedVia: 'manual', ...p,
   };

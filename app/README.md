@@ -5,13 +5,13 @@
 - 功能依據：`../v1/prototype-v1-2026-11-17.canvas.tsx`（雛形）
 - 驗收規格：`../spec/features/*.feature`（每個「情境」都有同名自動化測試，`tests/unit/spec-coverage.test.ts` 會檢查）
 
-> 本專案**沒有部署**任何東西，也沒有建立任何雲端帳號或專案。
+> 網頁版由 GitHub Actions 發佈到 GitHub Pages；中繼資料代理是另外部署的 Cloudflare Worker（`https://interest-collection-proxy.george-cheng.workers.dev`），App 預設使用、可在設定關掉。
 
 ## iOS App（Capacitor，用自己的 Mac + Xcode + 免費 Apple ID 安裝）
 
 同一份程式也可以包成 iPhone App（`ios/` 是 Capacitor 8 產生的 Xcode 專案，使用 Swift Package Manager，**不需要 CocoaPods**）。安裝步驟寫在專案根目錄的 **[`../INSTALL-MAC.md`](../INSTALL-MAC.md)**（壓縮包解壓後就在最上層）。
 
-- 原生版在 iPhone 上用 `CapacitorHttp` 直接讀 IG／X／Threads 貼文頁的 og 標籤（不受 CORS 限制），讀不到才走公開 oEmbed → 代理（僅開啟時）→ 手動補充。Web／PWA 的抓取順序**完全不變**（`src/lib/fetchMeta.ts`、`src/lib/nativeHttp.ts`）。
+- 原生版在 iPhone 上用 `CapacitorHttp` 直接讀 IG／X／Threads 貼文頁的 og 標籤（不受 CORS 限制），讀不到才走公開 oEmbed → 代理（預設開啟，可關）→ 手動補充。Web／PWA 的抓取順序**完全不變**（`src/lib/fetchMeta.ts`、`src/lib/nativeHttp.ts`）。
 - 自訂網址：`interestcollection://add?url=<貼文網址>`（可給「捷徑」使用）。
 - 相關指令：`npm run cap:sync`（build + `cap sync ios`）、`npm run cap:open`（用 Xcode 打開，只能在 Mac 執行）、`npm run ios:icons`（重產 App 圖示）。
 
@@ -31,7 +31,7 @@ npm run build:single # 單一 HTML → dist-single/george-interest-collection.ht
 npm test             # Vitest：單元 + BDD 情境（jsdom，無代理、無網路）
 npm run test:e2e     # 先 build 兩種版本，再用 Playwright + 本機 Google Chrome 跑 e2e
 npm run check:links  # 驗證三個真實網址的伺服器端／瀏覽器端可讀性 → /tmp/interest-app-link-fetch.txt
-npm run proxy        # （可選）啟動中繼資料代理外掛 http://localhost:8787
+npm run proxy        # （可選）在本機啟動中繼資料代理 http://localhost:8787（開發用；App 預設用已部署的 Worker）
 ```
 
 | script | 用途 |
@@ -71,13 +71,13 @@ app/
 │  ├─ components/             # ListView、Detail、各種表單 sheet、UI 元件
 │  └─ lib/
 │     ├─ parse.ts             # 來源辨識、帳號解析、LINE 分享文字取網址、地區／分類推斷
-│     ├─ fetchMeta.ts         # 抓取流程：直接 fetch → 公開 oEmbed → 代理（僅開啟時）
+│     ├─ fetchMeta.ts         # 抓取流程：直接 fetch → 公開 oEmbed → 代理（預設開啟，可關）
 │     ├─ og.ts                # og 標籤解析與各平台標題整理
 │     ├─ share.ts             # LINE 分享網址、分享文字、匯出文字／CSV、複製、下載
 │     ├─ storage.ts           # IndexedDB / localStorage / 記憶體、清掉舊版示範資料、設定
 │     ├─ thumbs.ts            # 縮圖過期判斷與真的重新抓取
 │     └─ image.ts             # 截圖縮小
-├─ proxy/server.mjs           # 可選中繼資料代理（外掛，零相依，預設不用）
+├─ proxy/server.mjs           # 本機版中繼資料代理（開發用，零相依；正式預設是 Cloudflare Worker）
 ├─ scripts/link-fetch-check.mjs  # 真實網址可讀性驗證
 ├─ tests/unit/*.test.ts       # 單元測試 + 規格覆蓋檢查
 ├─ tests/features/*.test.tsx  # 對應 7 個 .feature 的 BDD 情境
@@ -114,17 +114,19 @@ App 支援 `?url=` 或 `?text=` 參數：開啟時會自動把內容帶進加入
 ## 可選中繼資料代理（外掛）怎麼開關
 
 - 程式：`proxy/server.mjs`（零相依，說明見 `proxy/README.md`）。**可關、非正式必要**；不用它，App 一樣完整可用（讀不到就走手動補充）。
-- 啟動（只在本機）：`npm run proxy` → `http://localhost:8787/meta?url=…`。停止：Ctrl+C。
-- App 端：右上「設定」→「中繼資料代理（外掛，預設關閉）」開關，以及代理網址。**預設關閉；關閉時 App 不會向代理送出任何請求**（有測試驗證）。開啟時也只在「直接抓取」與「公開 oEmbed」都拿不到資料後才問代理。
-- 限制：iPhone 上的 https PWA 不能呼叫 `http://localhost`（那是手機自己，且會被混合內容擋下）。要在手機上用，必須自行以 https 架設，這超出 v1 範圍，本專案也**沒有部署**它。代理只允許 IG／Threads／X 網域，請勿做成公開服務。
+- 預設代理：已部署的 Cloudflare Worker `https://interest-collection-proxy.george-cheng.workers.dev`（`/meta?url=…`）。
+- 本機開發版：`npm run proxy` → `http://localhost:8787/meta?url=…`。停止：Ctrl+C。
+- App 端：右上「設定」→「中繼資料代理（外掛）」開關，以及代理網址。**預設開啟**，而且只在「直接抓取」與「公開 oEmbed」都拿不到資料後才問代理；**關掉後 App 不會向代理送出任何請求**（有測試驗證）。
+- 舊設定遷移：如果裝置上存的代理網址是空白或 `localhost`／`127.0.0.1`（舊版預設），開啟時會改成 Worker 網址並打開代理，然後寫回；使用者自己填的其他網址與開關不會被動到。
+- 限制：iPhone 上的 https PWA 不能呼叫 `http://localhost`（那是手機自己，且會被混合內容擋下），所以手機上用的是 https 的 Worker。代理只允許 IG／Threads／X 網域。私人或限制年齡的貼文代理也讀不到，仍走手動補充。
 
 ## 資料與功能說明
 
 - 全新開啟是空的，畫面上會請你貼上 Instagram、X 或 Threads 的連結。舊版寫進這台裝置的示範資料（已知 id 或網址，例如河岸散策、隱藏台北小吃）會在開啟時刪掉；你自己加的收藏會留下，之後也不會再寫入範例。
-- 地區必填，無法判斷時預設「其他」；確認畫面與手動補充都可取消選取，取消後「加入」按鈕會停用。
+- 地區必填，用下拉選單選：台北、新北、桃竹、台中、台南、高雄、宜蘭、其他（清單篩選也用同一組）。無法判斷時預設「其他」；確認畫面與手動補充可改回「請選擇」，此時「加入」按鈕會停用。舊資料的「台北市／新北市／桃園市／台中市／台南市／高雄市」開啟時轉成新名稱並寫回；其他自訂值（例如「花蓮」）原樣保留，在詳情的下拉選單與地區篩選裡都看得到、選得到。
 - 分享到 LINE 用官方網址 `https://line.me/R/share?text=…`（文字含名稱、地區、連結；單則另附 `https://social-plugins.line.me/lineit/share?url=…` 只分享連結）。也可複製或用系統分享。
 - 匯出：目前畫面或全部收藏；純文字或 CSV（欄位：清單、名稱、地區、連結；CSV 加 UTF-8 BOM）；可複製或下載。
-- 縮圖過期：Instagram CDN 網址的 `oe=` 參數是到期時間，到期或圖片載入失敗時會**自動**重新抓取（直接 → oEmbed → 代理[若開啟]），顯示「縮圖已過期 → 正在更新… → 已更新」；失敗時保留既有縮圖網址或改顯示分類圖示，標記「更新失敗」，收藏本身不受影響，6 小時後下次開啟再試。
+- 縮圖過期：Instagram CDN 網址的 `oe=` 參數是到期時間，到期或圖片載入失敗時會**自動**重新抓取（直接 → oEmbed → 代理[預設開啟]），顯示「縮圖已過期 → 正在更新… → 已更新」；失敗時保留既有縮圖網址或改顯示分類圖示，標記「更新失敗」，收藏本身不受影響，6 小時後下次開啟再試。
 - 連結失效：X 的公開 oEmbed 回 404、Threads oEmbed 回 400/404、或直接抓到 404/410 時判定失效，詢問「先保留（留下『連結失效』標記）／刪除（再確認一次）」。詳情頁的「檢查連結與更新縮圖」會真的去檢查。縮圖過期仍會自動重抓，不需要另外的示範按鈕。
 
 ## iOS Safari 實際行為
@@ -144,7 +146,7 @@ App 支援 `?url=` 或 `?text=` 參數：開啟時會自動把內容帶進加入
 ## 已知缺口（v1）
 
 - 沒有在真的 iPhone 上驗證（CORS 結果來自 Chrome；Safari 預期相同）。
-- Instagram／Threads 在無代理時拿不到標題與縮圖，只能手動補充；X 透過 oEmbed 拿得到文字但沒有縮圖。
+- Instagram／Threads 在代理關掉（或代理也讀不到）時拿不到標題與縮圖，只能手動補充；X 透過 oEmbed 拿得到文字但沒有縮圖。
 - 沒有 JSON 備份／還原（只有文字／CSV 匯出）；換手機無法搬資料。
-- 地區只有「其他」與六都；分類一則只能一個。
-- 代理沒有部署，手機上實際無法使用（除非自行用 https 架設）。
+- 地區選項固定為台北、新北、桃竹、台中、台南、高雄、宜蘭、其他（舊資料或自訂值會保留）；分類一則只能一個。
+- 代理預設開啟（Cloudflare Worker），讀不到時貼文網址會送到 Worker；不想送出可在「設定」關掉。私人貼文代理也讀不到。

@@ -2,6 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
+// 中繼資料代理預設開啟（Cloudflare Worker）。e2e 不打真的代理：一律擋下，讓結果固定（讀不到就走手動補充）
+test.beforeEach(async ({ context }) => {
+  await context.route('https://interest-collection-proxy.george-cheng.workers.dev/**', (route) => route.abort());
+});
+
 async function manualAdd(page: Page, url: string, name: string) {
   await page.getByLabel('貼上社群來源的連結').fill(url);
   await page.getByRole('button', { name: '加入', exact: true }).click();
@@ -101,7 +106,7 @@ test('真實網路：X 公開 oEmbed 可從瀏覽器讀到 → 確認畫面；In
   const confirm = page.getByRole('dialog', { name: '確認地區後加入' });
   await expect(confirm).toBeVisible({ timeout: 25_000 });
   await expect(confirm.getByText('just setting up my twttr')).toBeVisible();
-  await expect(confirm.getByRole('group', { name: '地區' }).getByRole('button', { name: '其他' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(confirm.getByRole('combobox', { name: '地區' })).toHaveValue('其他');
   await confirm.getByRole('button', { name: '取消' }).click();
 
   await page.getByLabel('貼上社群來源的連結').fill('https://www.instagram.com/natgeo/p/DHrUZ11yOh0/');

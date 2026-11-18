@@ -54,7 +54,7 @@ const isDeadStatus = (s: number) => s === 404 || s === 410;
  * 取得貼文資訊。順序：
  *   1. 裝置直接 fetch 貼文網址，讀 og 標籤（IG／Threads／X 幾乎都會被 CORS 擋）
  *   2. 公開 oEmbed（X：publish.x.com，失敗再 publish.twitter.com；Threads：graph.threads.net，只能確認存在）
- *   3. 只有在設定中「開啟」中繼資料代理時，才請求代理
+ *   3. 前兩步都拿不到資料、且設定中的中繼資料代理是開啟的（預設開啟），才請求代理
  * 全部失敗就回傳失敗原因，由畫面改開手動補充表單。
  */
 export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaResult> {
@@ -122,7 +122,7 @@ export async function fetchPostMeta(url: string, deps: FetchDeps): Promise<MetaR
     }
   }
 
-  // 3. 可選代理（預設關閉；關閉時絕不送出）
+  // 3. 可選代理（預設開啟；使用者關掉時絕不送出）
   if (deps.settings.proxyEnabled && deps.settings.proxyUrl) {
     const target = proxyEndpoint(deps.settings, canonical);
     try {

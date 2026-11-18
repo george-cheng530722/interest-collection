@@ -1,10 +1,11 @@
 import type { Category, City, Item, ItemStatus, Source } from '../lib/types';
-import { CATEGORIES, CITIES, SOURCES, APP_NAME } from '../lib/constants';
+import { CATEGORIES, CITIES, SOURCES, APP_NAME, isKnownCity } from '../lib/constants';
 import { itemName } from '../lib/share';
 import { shortUrl } from '../lib/parse';
 import { Btn, Chip, SourceTag, Stars, Tag, Thumb } from './ui';
 
-export interface Filters { tab: ItemStatus; source: Source | '全部'; category: Category | '全部'; city: City | '全部' }
+/** '全部' 代表不篩選。city 可能是 CITIES 以外的舊資料或自訂地區 */
+export interface Filters { tab: ItemStatus; source: Source | '全部'; category: Category | '全部'; city: City | (string & {}) | '全部' }
 
 export function applyFilters(items: Item[], f: Filters): Item[] {
   return items
@@ -25,7 +26,11 @@ export function ListView(props: {
 }) {
   const { items, visible, filters: f, setFilters } = props;
   const inTab = items.filter((it) => it.status === f.tab);
-  const usedCities = CITIES.filter((c) => inTab.some((it) => it.city === c));
+  // 目前分頁用到的 CITIES（照固定順序），再加上清單外的舊值或自訂地區，讓它們也能篩
+  const usedCities: string[] = [
+    ...CITIES.filter((c) => inTab.some((it) => it.city === c)),
+    ...[...new Set(inTab.map((it) => it.city))].filter((c) => c && !isKnownCity(c)),
+  ];
   const set = (p: Partial<Filters>) => setFilters({ ...f, ...p });
   return (
     <div className="screen">
@@ -38,7 +43,7 @@ export function ListView(props: {
       <form className="add-box" onSubmit={(e) => { e.preventDefault(); props.onAdd(); }}>
         <div className="field">
           <label htmlFor="add-input" className="field-label">貼上社群來源的連結</label>
-          <textarea id="add-input" rows={2} value={props.input} onChange={(e) => props.setInput(e.target.value)} placeholder="貼上 Instagram、X 跟 Threads 的連結，或 LINE 分享的文字" autoCapitalize="off" autoCorrect="off" />
+          <textarea id="add-input" rows={2} value={props.input} onChange={(e) => props.setInput(e.target.value)} placeholder="填上IG、X跟Threads、LINE" autoCapitalize="off" autoCorrect="off" />
         </div>
         <div className="row"><Btn type="submit" label={props.loading ? '讀取中…' : '加入'} primary disabled={props.loading} block /></div>
         <div className="row"><Btn label="分享清單" onClick={props.onShareList} disabled={visible.length === 0} block /><Btn label="匯出" onClick={props.onExport} disabled={visible.length === 0} block /></div>
@@ -49,15 +54,15 @@ export function ListView(props: {
         <Chip label="已完成" count={items.filter((i) => i.status === '已完成').length} active={f.tab === '已完成'} onClick={() => set({ tab: '已完成' })} />
       </nav>
       <div className="chip-row" role="group" aria-label="來源篩選">
-        <Chip label="全部來源" active={f.source === '全部'} onClick={() => set({ source: '全部' })} />
+        <Chip label="來源" active={f.source === '全部'} onClick={() => set({ source: '全部' })} />
         {SOURCES.map((s) => <Chip key={s} label={s} count={inTab.filter((i) => i.source === s).length} active={f.source === s} onClick={() => set({ source: s })} />)}
       </div>
       <div className="chip-row" role="group" aria-label="分類篩選">
-        <Chip label="全部分類" count={inTab.length} active={f.category === '全部'} onClick={() => set({ category: '全部' })} />
+        <Chip label="分類" count={inTab.length} active={f.category === '全部'} onClick={() => set({ category: '全部' })} />
         {CATEGORIES.map((c) => <Chip key={c} label={c} count={inTab.filter((i) => i.category === c).length} active={f.category === c} onClick={() => set({ category: c })} />)}
       </div>
       <div className="chip-row" role="group" aria-label="地區篩選">
-        <Chip label="全部地區" active={f.city === '全部'} onClick={() => set({ city: '全部' })} />
+        <Chip label="地區" active={f.city === '全部'} onClick={() => set({ city: '全部' })} />
         {usedCities.map((c) => <Chip key={c} label={c} count={inTab.filter((i) => i.city === c).length} active={f.city === c} onClick={() => set({ city: c })} />)}
       </div>
       <main className="scroll pad-x" aria-label="收藏清單">

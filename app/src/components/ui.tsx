@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { Category, Item, Source } from '../lib/types';
 import { thumbLabel } from '../lib/thumbs';
+import { CITIES, isKnownCity } from '../lib/constants';
 
 export function Chip({ label, count, active, onClick, disabled }: { label: string; count?: number; active: boolean; onClick: () => void; disabled?: boolean }) {
   return (
@@ -27,6 +28,21 @@ export function Field({ label, value, onChange, placeholder, multiline, required
         ? <textarea id={id} name={name} value={value} placeholder={placeholder} rows={3} onChange={(e) => onChange(e.target.value)} />
         : <input id={id} name={name} type="text" inputMode={inputMode} autoCapitalize="off" autoCorrect="off" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />}
     </div>
+  );
+}
+
+/**
+ * 地區下拉選單（原生 <select>，名稱「地區」）。
+ * 目前的值（或 keep 傳入的原本值）若不在 CITIES（舊資料或自訂地區），會多列在最後，照樣顯示、照樣可選。
+ */
+export function CitySelect({ value, onChange, allowEmpty = true, keep }: { value: string; onChange: (c: string) => void; allowEmpty?: boolean; keep?: string }) {
+  const extras = [...new Set([keep ?? '', value])].filter((c) => c && !isKnownCity(c));
+  return (
+    <select className="select" aria-label="地區" value={value} onChange={(e) => onChange(e.target.value)}>
+      {allowEmpty || !value ? <option value="" disabled={!allowEmpty}>請選擇</option> : null}
+      {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+      {extras.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>
   );
 }
 

@@ -5,7 +5,7 @@ import { DEFAULT_CITY, defaultEmoji } from './lib/constants';
 import { classify, extractPostUrl, inferCity, isLikelyUnreadable, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from './lib/parse';
 import { failMessage, fetchPostMeta, type FailReason } from './lib/fetchMeta';
 import { isThumbExpired, refreshThumb } from './lib/thumbs';
-import { loadSettings, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
+import { loadSettings, migrateLegacyCities, removeStoredDemoItems, saveSettings, storageEstimate, StorageFullError, type Store } from './lib/storage';
 import { shareItemText, shareListText } from './lib/share';
 import { applyFilters, ListView, type Filters } from './components/ListView';
 import { Detail } from './components/Detail';
@@ -78,6 +78,7 @@ export default function App({ store, fetchImpl, initialShared }: AppProps) {
     (async () => {
       try {
         await removeStoredDemoItems(store);
+        await migrateLegacyCities(store);
         const [all, s] = await Promise.all([store.getItems(), loadSettings(store)]);
         const now = Date.now();
         // 上次中斷的更新、或很久以前失敗的縮圖，這次開啟時再自動試一次

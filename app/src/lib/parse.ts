@@ -107,12 +107,13 @@ export function classify(text: string): Category {
 /** 依說明文字推斷地區；判斷不出來一律回傳「其他」 */
 export function inferCity(text: string): City {
   const s = text || '';
-  if (/新北|九份|淡水|三峽|板橋|林口|永和|中和|新店|三重|瑞芳|烏來/.test(s)) return '新北市';
-  if (/台中|臺中|逢甲|一中街|審計新村/.test(s)) return '台中市';
-  if (/台南|臺南|鹽水|安平|赤崁|國華街/.test(s)) return '台南市';
-  if (/高雄|駁二|旗津|美濃/.test(s)) return '高雄市';
-  if (/桃園|中壢|大溪/.test(s)) return '桃園市';
-  if (/台北|臺北|師大|大稻埕|迪化街|松山|五分埔|永康|大同區|大安|信義區|西門|士林|中山站|北投/.test(s)) return '台北市';
+  if (/新北|九份|淡水|三峽|板橋|林口|永和|中和|新店|三重|瑞芳|烏來/.test(s)) return '新北';
+  if (/台中|臺中|逢甲|一中街|審計新村/.test(s)) return '台中';
+  if (/台南|臺南|鹽水|安平|赤崁|國華街/.test(s)) return '台南';
+  if (/高雄|駁二|旗津|美濃/.test(s)) return '高雄';
+  if (/桃園|中壢|大溪|新竹|竹北|內灣/.test(s)) return '桃竹';
+  if (/宜蘭|羅東|礁溪|頭城|蘇澳|冬山|五結|太平山/.test(s)) return '宜蘭';
+  if (/台北|臺北|師大|大稻埕|迪化街|松山|五分埔|永康|大同區|大安|信義區|西門|士林|中山站|北投/.test(s)) return '台北';
   return DEFAULT_CITY;
 }
 

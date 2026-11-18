@@ -3,8 +3,8 @@ import { render } from '@testing-library/react';
 import App from '../../src/App';
 import { dialog, makeDevice, makeItem, preload, renderApp, screen, within } from '../helpers';
 
-const A = makeItem({ id: 'a', name: '阿明拉麵', city: '台北市', url: 'https://www.instagram.com/p/AAA/', createdAt: 2 });
-const B = makeItem({ id: 'b', name: '鹽水碗粿', city: '台南市', url: 'https://x.com/food/status/123', source: 'X', createdAt: 1 });
+const A = makeItem({ id: 'a', name: '阿明拉麵', city: '台北', url: 'https://www.instagram.com/p/AAA/', createdAt: 2 });
+const B = makeItem({ id: 'b', name: '鹽水碗粿', city: '台南', url: 'https://x.com/food/status/123', source: 'X', createdAt: 1 });
 const C = makeItem({ id: 'c', name: '收攤前香腸', city: '其他', url: 'https://www.threads.net/@s/post/CCC', source: 'Threads', createdAt: 3, status: '已完成', rating: 4, review: '好吃' });
 
 async function setup() {
@@ -42,7 +42,7 @@ describe('功能: 備註、分享到 LINE 與匯出', () => {
     const link = within(dlg).getByRole('link', { name: '用 LINE 分享' });
     const text = decodeLine(link.getAttribute('href')!);
     expect(text).toContain('阿明拉麵');
-    expect(text).toContain('地區：台北市');
+    expect(text).toContain('地區：台北');
     expect(text).toContain('https://www.instagram.com/p/AAA/');
     expect(link).toHaveAttribute('target', '_blank');
     expect(within(dlg).getByRole('link', { name: /只分享連結/ }).getAttribute('href')).toBe('https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent('https://www.instagram.com/p/AAA/'));
@@ -69,7 +69,7 @@ describe('功能: 備註、分享到 LINE 與匯出', () => {
     const dlg = await dialog('匯出清單');
     const preview = () => within(dlg).getByLabelText('匯出內容預覽').textContent!;
     expect(preview()).toContain('名稱：阿明拉麵');
-    expect(preview()).toContain('地區：台北市');
+    expect(preview()).toContain('地區：台北');
     expect(preview()).toContain('連結：https://www.instagram.com/p/AAA/');
     await user.click(within(dlg).getByRole('button', { name: '複製' }));
     expect(await navigator.clipboard.readText()).toContain('名稱：鹽水碗粿');
@@ -77,8 +77,8 @@ describe('功能: 備註、分享到 LINE 與匯出', () => {
     await user.click(within(dlg).getByRole('button', { name: 'CSV' }));
     const lines = preview().trim().split(/\r?\n/);
     expect(lines[0]).toBe('清單,名稱,地區,連結');
-    expect(lines).toContain('想體驗,阿明拉麵,台北市,https://www.instagram.com/p/AAA/');
-    expect(lines).toContain('想體驗,鹽水碗粿,台南市,https://x.com/food/status/123');
+    expect(lines).toContain('想體驗,阿明拉麵,台北,https://www.instagram.com/p/AAA/');
+    expect(lines).toContain('想體驗,鹽水碗粿,台南,https://x.com/food/status/123');
 
     const created: Blob[] = [];
     vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => { created.push(b as Blob); return 'blob:x'; });

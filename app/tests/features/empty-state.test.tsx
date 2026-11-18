@@ -9,6 +9,7 @@ describe('空白的開始', () => {
     expect(empty).toHaveTextContent('還沒有收藏');
     expect(empty).toHaveTextContent('貼上 Instagram、X 或 Threads 的連結');
     expect(screen.queryAllByTestId('item-card')).toHaveLength(0);
+    expect(screen.getByLabelText('貼上社群來源的連結')).toHaveAttribute('placeholder', '填上IG、X跟Threads、LINE');
     expect(screen.queryByRole('button', { name: '填入範例' })).toBeNull();
     expect(screen.queryByRole('button', { name: '填入私人貼文範例' })).toBeNull();
     expect(screen.queryByRole('button', { name: '模擬縮圖過期' })).toBeNull();

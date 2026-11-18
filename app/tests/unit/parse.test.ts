@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classify, detectSource, extractPostUrl, inferCity, isLikelyUnreadable, normalizeUrl, parseUrlMeta, sameUrl, thumbExpiryFromUrl } from '../../src/lib/parse';
+import { CITIES } from '../../src/lib/constants';
 
 describe('來源辨識與帳號解析', () => {
   it.each([
@@ -50,9 +51,21 @@ describe('分類、地區、私人判斷、縮圖到期', () => {
   it('地區無法判斷時預設「其他」', () => {
     expect(inferCity('just setting up my twttr')).toBe('其他');
     expect(inferCity('')).toBe('其他');
-    expect(inferCity('大稻埕河岸手沖')).toBe('台北市');
-    expect(inferCity('鹽水碗粿')).toBe('台南市');
-    expect(inferCity('逢甲烤香腸')).toBe('台中市');
+    expect(inferCity('大稻埕河岸手沖')).toBe('台北');
+    expect(inferCity('鹽水碗粿')).toBe('台南');
+    expect(inferCity('逢甲烤香腸')).toBe('台中');
+  });
+  it('地區用新名稱（台北、桃竹、宜蘭…），不再回傳「台北市」這類舊名稱', () => {
+    expect(inferCity('台北車站')).toBe('台北');
+    expect(inferCity('九份老街')).toBe('新北');
+    expect(inferCity('桃園機場')).toBe('桃竹');
+    expect(inferCity('中壢夜市')).toBe('桃竹');
+    expect(inferCity('大溪老街')).toBe('桃竹');
+    expect(inferCity('宜蘭三星蔥')).toBe('宜蘭');
+    expect(inferCity('羅東夜市')).toBe('宜蘭');
+    expect(inferCity('礁溪溫泉')).toBe('宜蘭');
+    expect(inferCity('駁二藝術特區')).toBe('高雄');
+    for (const t of ['台北車站', '桃園機場', '羅東夜市', '旗津', '安平']) expect(CITIES).toContain(inferCity(t));
   });
   it('分類', () => {
     expect(classify('叉燒拉麵')).toBe('吃');

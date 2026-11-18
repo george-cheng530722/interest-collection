@@ -4,4 +4,4 @@
 
 - 線上版：https://george-cheng530722.github.io/interest-collection/
 - 程式：`app/`（Vite + React）；驗收規格：`spec/features/`（BDD）
-- 部署：push 到 `main` 由 GitHub Actions 建置 `app/dist` 發佈到 GitHub Pages。可選的中繼資料代理 `app/proxy/` 不會部署，預設關閉。
+- 部署：push 到 `main` 由 GitHub Actions 建置 `app/dist` 發佈到 GitHub Pages。中繼資料代理預設開啟，使用已部署的 Cloudflare Worker `https://interest-collection-proxy.george-cheng.workers.dev`（只在裝置直接讀不到時才呼叫，可在「設定」關掉；私人貼文代理也讀不到，仍走手動補充）。`app/proxy/server.mjs` 是同一個介面的本機開發版。

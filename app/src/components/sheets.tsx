@@ -1,25 +1,18 @@
 import { useRef, useState } from 'react';
-import type { Category, City, Item, Settings } from '../lib/types';
-import { CATEGORIES, CITIES, defaultEmoji } from '../lib/constants';
+import type { Category, Item, Settings } from '../lib/types';
+import { CATEGORIES, defaultEmoji } from '../lib/constants';
+import { DEFAULT_PROXY_URL } from '../lib/types';
 import { shortUrl } from '../lib/parse';
 import { failMessage, type FailReason } from '../lib/fetchMeta';
 import { copyText, downloadText, exportCsv, exportFileName, exportText, itemName, lineItShareUrl, lineShareUrl } from '../lib/share';
 import { fileToThumbDataUrl } from '../lib/image';
 import type { StoreKind } from '../lib/storage';
-import { Btn, Chip, Field, Preview, Sheet, SourceTag, Stars, Tag, Thumb } from './ui';
+import { Btn, Chip, CitySelect, Field, Preview, Sheet, SourceTag, Stars, Tag, Thumb } from './ui';
 
 function CategoryPicker({ value, onChange }: { value: Category | ''; onChange: (c: Category | '') => void }) {
   return (
     <div role="group" aria-label="分類" className="chips-wrap">
       {CATEGORIES.map((c) => <Chip key={c} label={c} active={value === c} onClick={() => onChange(value === c ? '' : c)} />)}
-    </div>
-  );
-}
-
-function CityPicker({ value, onChange, allowEmpty = true }: { value: City | ''; onChange: (c: City | '') => void; allowEmpty?: boolean }) {
-  return (
-    <div role="group" aria-label="地區" className="chips-wrap">
-      {CITIES.map((c) => <Chip key={c} label={c} active={value === c} onClick={() => onChange(value === c && allowEmpty ? '' : c)} />)}
     </div>
   );
 }
@@ -41,7 +34,7 @@ export function ConfirmAddSheet({ draft, onChange, onCancel, onConfirm }: { draf
       <div className="label">分類</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填，已預填，請確認）</div>
-      <CityPicker value={draft.city} onChange={(city) => onChange({ city })} />
+      <CitySelect value={draft.city} onChange={(city) => onChange({ city })} />
       <div className="hint">若讀不到地區，會先填「其他」，你可以直接改。</div>
       {!draft.city ? <div className="error" role="alert">請選擇地區，才能加入收藏。</div> : null}
       {!draft.category ? <div className="error" role="alert">請選擇分類。</div> : null}
@@ -73,7 +66,7 @@ export function ManualSheet({ draft, reason, onChange, onCancel, onSave }: { dra
       <div className="label">分類（必填）</div>
       <CategoryPicker value={draft.category} onChange={(category) => onChange({ category, emoji: defaultEmoji(category) })} />
       <div className="label">地區（必填；不明時先填「其他」）</div>
-      <CityPicker value={draft.city} onChange={(city) => onChange({ city })} />
+      <CitySelect value={draft.city} onChange={(city) => onChange({ city })} />
       <div className="field">
         <span className="field-label">截圖當縮圖（選填）</span>
         <input ref={fileRef} type="file" accept="image/*" aria-label="選擇截圖" className="visually-hidden" onChange={async (e) => {
@@ -185,9 +178,9 @@ export function SettingsSheet({ settings, storeKind, usage, onChange, onClose }:
       <div className="setting">
         <label className="switch-row">
           <input type="checkbox" role="switch" aria-label="中繼資料代理（外掛）" checked={settings.proxyEnabled} onChange={(e) => onChange({ ...settings, proxyEnabled: e.target.checked })} />
-          <span><span className="strong">中繼資料代理（外掛，預設關閉）</span><br /><span className="muted small">開啟後，裝置直接讀不到時才會把貼文網址送到下方代理以取得標題與縮圖。關閉時完全不會向代理送出請求。不需要它也能完整使用（走手動補充）。</span></span>
+          <span><span className="strong">中繼資料代理（外掛）</span><br /><span className="muted small">預設開啟。只有在裝置直接讀不到貼文時，才會把貼文網址送到下方代理以取得標題與縮圖。可以隨時關掉；關掉後完全不會向代理送出請求，讀不到時改走手動補充。私人貼文代理也讀不到，一樣請手動補充。</span></span>
         </label>
-        <Field label="代理網址" value={settings.proxyUrl} onChange={(proxyUrl) => onChange({ ...settings, proxyUrl })} placeholder="http://localhost:8787" inputMode="url" />
+        <Field label="代理網址" value={settings.proxyUrl} onChange={(proxyUrl) => onChange({ ...settings, proxyUrl })} placeholder={DEFAULT_PROXY_URL} inputMode="url" />
       </div>
       <div className="setting">
         <div className="strong">資料存放位置</div>

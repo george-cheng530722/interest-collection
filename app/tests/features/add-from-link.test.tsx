@@ -3,7 +3,9 @@ import { IG_URL, THREADS_URL, X_URL, calledUrls, corsBlockedFetch, dialog, htmlR
 
 const fresh = async () => { const d = makeDevice(); const store = await d.open(); await preload(store, []); return { d, store }; };
 
-describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟用中繼資料代理）', () => {
+const PROXY_META = 'https://interest-collection-proxy.george-cheng.workers.dev/meta?url=';
+
+describe('功能: 從貼文網址加入收藏（背景：本機開啟、預設設定＝中繼資料代理開啟）', () => {
   it('情境: 辨識 Instagram 網址並顯示來源', async () => {
     const { store } = await fresh();
     const { user } = await renderApp({ store });
@@ -39,7 +41,22 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟�
     await dialog('讀取失敗，請手動補充');
     const urls = calledUrls(fetchImpl);
     expect(urls[0]).toBe(IG_URL); // 第一個請求就是裝置直接抓貼文本身
-    expect(urls.some((u) => u.includes('8787') || u.includes('/meta?'))).toBe(false); // 不呼叫代理
+    // 直接抓（Instagram 沒有免金鑰 oEmbed）失敗後，才呼叫預設開啟的代理，而且在最後
+    expect(urls).toEqual([IG_URL, PROXY_META + encodeURIComponent(IG_URL)]);
+    expect(urls.some((u) => u.includes('localhost') || u.includes('8787'))).toBe(false);
+  });
+
+  it('X：先直接抓、再讀公開 oEmbed，都失敗才呼叫預設代理', async () => {
+    const { store } = await fresh();
+    const fetchImpl = corsBlockedFetch();
+    const { user } = await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
+    await pasteAndAdd(user, X_URL);
+    await dialog('讀取失敗，請手動補充');
+    const urls = calledUrls(fetchImpl);
+    expect(urls[0]).toBe(X_URL);
+    expect(urls.slice(1, -1).every((u) => u.includes('/oembed?'))).toBe(true);
+    expect(urls.slice(1, -1).length).toBeGreaterThan(0);
+    expect(urls[urls.length - 1]).toBe(PROXY_META + encodeURIComponent(X_URL));
   });
 
   it('情境: 直接抓取成功時帶到確認畫面', async () => {
@@ -58,17 +75,18 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟�
     expect(within(dlg).getByLabelText('名稱')).toHaveValue('阿明拉麵');
     expect(within(dlg).getByText('@natgeo')).toBeInTheDocument();
     expect(within(dlg).getByText('Instagram')).toBeInTheDocument();
-    // 地區已依說明預填（大稻埕 → 台北市），必須確認後才完成
-    const cityGroup = within(dlg).getByRole('group', { name: '地區' });
-    expect(within(cityGroup).getByRole('button', { name: '台北市' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(cityGroup).getByRole('button', { name: '台北市' })); // 取消選取 → 空白
+    // 地區已依說明預填（大稻埕 → 台北），必須確認後才完成
+    const citySelect = within(dlg).getByRole('combobox', { name: '地區' });
+    expect(citySelect).toHaveValue('台北');
+    await user.selectOptions(citySelect, ''); // 改回「請選擇」→ 空白
     expect(within(dlg).getByRole('button', { name: '加入收藏' })).toBeDisabled();
-    await user.click(within(cityGroup).getByRole('button', { name: '台北市' }));
+    expect(within(dlg).getByText('請選擇地區，才能加入收藏。')).toBeInTheDocument();
+    await user.selectOptions(citySelect, '台北');
     await user.click(within(dlg).getByRole('button', { name: '加入收藏' }));
     expect(await screen.findByTestId('detail-name')).toHaveTextContent('阿明拉麵');
     const saved = await store.getItems();
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ city: '台北市', manual: false, fetchedVia: 'direct', category: '吃' });
+    expect(saved[0]).toMatchObject({ city: '台北', manual: false, fetchedVia: 'direct', category: '吃' });
   });
 
   it('情境: 被 CORS 或網路擋下時改走手動補充並預填欄位', async () => {
@@ -94,8 +112,9 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟�
     const { user } = await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
     await pasteAndAdd(user, X_URL);
     const dlg = await dialog('確認地區後加入');
-    const cityGroup = within(dlg).getByRole('group', { name: '地區' });
-    expect(within(cityGroup).getByRole('button', { name: '其他' })).toHaveAttribute('aria-pressed', 'true');
+    const citySelect = within(dlg).getByRole('combobox', { name: '地區' });
+    expect(citySelect).toHaveValue('其他');
+    expect(within(citySelect).getAllByRole('option').map((o) => o.textContent)).toEqual(['請選擇', '台北', '新北', '桃竹', '台中', '台南', '高雄', '宜蘭', '其他']);
     expect(screen.queryByText('線上')).toBeNull();
     expect(screen.queryByText('未指定')).toBeNull();
     await user.click(within(dlg).getByRole('button', { name: '加入收藏' }));
@@ -111,7 +130,7 @@ describe('功能: 從貼文網址加入收藏（背景：本機開啟、未啟�
     await user.type(within(dlg).getByLabelText(/^名稱/), '測試');
     const save = within(dlg).getByRole('button', { name: '儲存並標記手動補充' });
     expect(save).toBeEnabled();
-    await user.click(within(within(dlg).getByRole('group', { name: '地區' })).getByRole('button', { name: '其他' }));
+    await user.selectOptions(within(dlg).getByRole('combobox', { name: '地區' }), '');
     expect(save).toBeDisabled();
     expect(within(dlg).getByText(/請填寫：地區/)).toBeInTheDocument();
     await user.click(save);

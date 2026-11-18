@@ -1,6 +1,7 @@
 export type Source = 'Instagram' | 'Threads' | 'X';
 export type Category = '吃' | '喝' | '玩' | '有趣' | '想 follow 學習';
-export type City = '其他' | '台北市' | '新北市' | '桃園市' | '台中市' | '台南市' | '高雄市';
+/** 新增／編輯時可選的地區。舊資料或自訂值（例如「花蓮」）仍以原字串保存與顯示，見 Item.city */
+export type City = '台北' | '新北' | '桃竹' | '台中' | '台南' | '高雄' | '宜蘭' | '其他';
 export type ItemStatus = '想體驗' | '已完成';
 /** ok：正常；expired：已過期待更新；refreshing：更新中；fresh：剛更新成功；failed：更新失敗（保留既有縮圖或後備圖示） */
 export type ThumbState = 'ok' | 'expired' | 'refreshing' | 'fresh' | 'failed';
@@ -16,7 +17,8 @@ export interface Item {
   /** 說明 */
   caption: string;
   category: Category | '';
-  city: City | '';
+  /** 通常是 City；舊版正式名稱以外的自訂值原樣保留；'' 表示尚未選擇 */
+  city: City | (string & {});
   status: ItemStatus;
   memo: string;
   /** 0 = 尚未評分；1–5 */
@@ -44,4 +46,10 @@ export interface Settings {
   proxyUrl: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { proxyEnabled: false, proxyUrl: 'http://localhost:8787' };
+/** 已部署的 Cloudflare Worker 中繼資料代理 */
+export const DEFAULT_PROXY_URL = 'https://interest-collection-proxy.george-cheng.workers.dev';
+
+export const DEFAULT_SETTINGS: Settings = {
+  proxyEnabled: true,
+  proxyUrl: DEFAULT_PROXY_URL,
+};

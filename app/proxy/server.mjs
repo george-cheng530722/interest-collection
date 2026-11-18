@@ -1,7 +1,8 @@
-// George 的 興趣收藏 — 可選的中繼資料代理（外掛，非必要，預設不使用）
+// George 的 興趣收藏 — 中繼資料代理的本機開發版（外掛，非必要）
 //
-// App 預設「不會」呼叫這個代理。只有在 App 的「設定」打開「中繼資料代理（外掛）」時，
-// 才會在裝置直接抓取失敗後，請求  GET {代理網址}/meta?url=<貼文網址>。
+// App 預設使用已部署的 Cloudflare Worker（https://interest-collection-proxy.george-cheng.workers.dev），
+// 不是這個本機版。要試這個版本，在 App「設定」把代理網址改成 http://localhost:8787（注意：舊預設的 localhost
+// 網址在開啟時會自動改回 Worker）。App 只在裝置直接抓取失敗後才請求  GET {代理網址}/meta?url=<貼文網址>。
 // 代理只做一件事：在伺服器端讀取公開貼文的 og 標籤，回傳 JSON。不儲存任何資料、沒有帳號。
 //
 // 啟動：  node proxy/server.mjs            （預設 http://localhost:8787）
@@ -70,6 +71,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const host = process.env.HOST || '127.0.0.1';
   createServer().listen(port, host, () => {
     console.log(`中繼資料代理（可選外掛）已啟動：http://${host === '127.0.0.1' ? 'localhost' : host}:${port}/meta?url=…`);
-    console.log('App 預設不會使用它；要用請到 App「設定」打開「中繼資料代理（外掛）」。Ctrl+C 停止。');
+    console.log('App 預設使用已部署的 Worker；這是本機開發版。Ctrl+C 停止。');
   });
 }

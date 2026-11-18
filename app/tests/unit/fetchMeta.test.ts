@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fetchPostMeta } from '../../src/lib/fetchMeta';
 import { extractOg, normalizeOg, textFromXEmbedHtml } from '../../src/lib/og';
-import { DEFAULT_SETTINGS } from '../../src/lib/types';
+import { DEFAULT_PROXY_URL, DEFAULT_SETTINGS } from '../../src/lib/types';
 
 const IG = 'https://www.instagram.com/natgeo/p/DHrUZ11yOh0/';
 const X = 'https://x.com/jack/status/20';
 const TH = 'https://www.threads.net/@natgeo/post/C7XSa54NOw1';
 const blocked = () => vi.fn(async (_u: RequestInfo | URL, _i?: RequestInit): Promise<Response> => { throw new TypeError('Failed to fetch'); });
 const urls = (f: ReturnType<typeof vi.fn>) => f.mock.calls.map((c) => String(c[0]));
+const PROXY_META = 'https://interest-collection-proxy.george-cheng.workers.dev/meta?url=';
+const NO_PROXY = { ...DEFAULT_SETTINGS, proxyEnabled: false };
 
 describe('og 解析（以 2026-11-17 實測的真實標籤為樣本）', () => {
   it('Instagram', () => {
@@ -23,11 +25,17 @@ describe('og 解析（以 2026-11-17 實測的真實標籤為樣本）', () => {
 });
 
 describe('抓取流程：直接 → 公開 oEmbed → 代理（只在開啟時）', () => {
-  it('Instagram 被 CORS 擋：回報 cors，且不碰代理', async () => {
+  it('Instagram 被 CORS 擋：回報 cors；代理關掉時不碰代理', async () => {
+    const f = blocked();
+    const r = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: NO_PROXY, online: true });
+    expect(r).toMatchObject({ ok: false, reason: 'cors' });
+    expect(urls(f)).toEqual([IG]); // Instagram 沒有免金鑰的 oEmbed
+  });
+  it('Instagram 被 CORS 擋：預設設定下先直接抓，失敗才問預設代理；代理也失敗仍回報 cors', async () => {
     const f = blocked();
     const r = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
     expect(r).toMatchObject({ ok: false, reason: 'cors' });
-    expect(urls(f)).toEqual([IG]); // Instagram 沒有免金鑰的 oEmbed
+    expect(urls(f)).toEqual([IG, PROXY_META + encodeURIComponent(IG)]);
   });
   it('X：直接被擋，改讀 publish.x.com oEmbed，並用整理過的網址', async () => {
     const shared = 'https://x.com/i/web/status/20?s=46&t=abc';
@@ -74,16 +82,21 @@ describe('抓取流程：直接 → 公開 oEmbed → 代理（只在開啟時�
     expect(await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: { ...DEFAULT_SETTINGS, proxyEnabled: true }, online: false })).toMatchObject({ ok: false, reason: 'offline' });
     expect(f).not.toHaveBeenCalled();
   });
-  it('代理預設關閉：絕不請求代理；開啟後才請求並採用結果', async () => {
-    expect(DEFAULT_SETTINGS.proxyEnabled).toBe(false);
+  it('代理預設開啟（Cloudflare Worker）：直接與 oEmbed 失敗後才請求並採用結果；關掉就絕不請求', async () => {
+    expect(DEFAULT_SETTINGS).toEqual({ proxyEnabled: true, proxyUrl: 'https://interest-collection-proxy.george-cheng.workers.dev' });
+    expect(DEFAULT_PROXY_URL).toBe(DEFAULT_SETTINGS.proxyUrl);
     const f = vi.fn(async (u: RequestInfo | URL) => {
-      if (String(u).startsWith('http://localhost:8787/meta')) return new Response(JSON.stringify({ status: 200, title: 'National Geographic 在 Instagram: "manatee"', description: '', image: 'https://cdn/x.jpg' }));
+      if (String(u).startsWith(PROXY_META)) return new Response(JSON.stringify({ status: 200, title: 'National Geographic 在 Instagram: "manatee"', description: '', image: 'https://cdn/x.jpg' }));
       throw new TypeError('Failed to fetch');
     });
-    const off = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
-    expect(off.ok).toBe(false);
-    expect(urls(f).some((u) => u.includes('8787'))).toBe(false);
-    const on = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: { ...DEFAULT_SETTINGS, proxyEnabled: true }, online: true });
+    const on = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: DEFAULT_SETTINGS, online: true });
     expect(on).toMatchObject({ ok: true, via: 'proxy', meta: { name: 'National Geographic', caption: 'manatee', handle: 'natgeo', image: 'https://cdn/x.jpg' } });
+    expect(urls(f)).toEqual([IG, PROXY_META + encodeURIComponent(IG)]); // 先直接抓，代理在最後
+
+    f.mockClear();
+    const off = await fetchPostMeta(IG, { fetchImpl: f as unknown as typeof fetch, settings: NO_PROXY, online: true });
+    expect(off.ok).toBe(false);
+    expect(urls(f).some((u) => u.includes('/meta?'))).toBe(false);
+    expect(urls(f)).toEqual([IG]);
   });
 });

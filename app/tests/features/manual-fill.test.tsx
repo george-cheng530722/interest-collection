@@ -40,7 +40,7 @@ describe('功能: 讀不到貼文時手動補充', () => {
     await user.click(within(cats).getByRole('button', { name: '玩' }));
     expect(save).toBeEnabled();
     // 地區空白
-    await user.click(within(within(dlg).getByRole('group', { name: '地區' })).getByRole('button', { name: '其他' }));
+    await user.selectOptions(within(dlg).getByRole('combobox', { name: '地區' }), '');
     expect(save).toBeDisabled();
     await user.click(save);
     expect(await store.getItems()).toHaveLength(0);
@@ -54,8 +54,8 @@ describe('功能: 讀不到貼文時手動補充', () => {
     await user.type(within(dlg).getByLabelText(/^名稱/), '海牛觀察');
     await user.type(within(dlg).getByLabelText('說明'), '佛州海牛保育日');
     await user.click(within(within(dlg).getByRole('group', { name: '分類' })).getByRole('button', { name: '想 follow 學習' }));
-    await user.click(within(within(dlg).getByRole('group', { name: '地區' })).getByRole('button', { name: '其他' }));
-    await user.click(within(within(dlg).getByRole('group', { name: '地區' })).getByRole('button', { name: '其他' }));
+    await user.selectOptions(within(dlg).getByRole('combobox', { name: '地區' }), '');
+    await user.selectOptions(within(dlg).getByRole('combobox', { name: '地區' }), '其他');
     await user.click(within(dlg).getByRole('button', { name: '儲存並標記手動補充' }));
     expect(await screen.findByTestId('detail-name')).toHaveTextContent('海牛觀察');
     expect(screen.getAllByText('手動補充').length).toBeGreaterThan(0);

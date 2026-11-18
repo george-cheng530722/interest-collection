@@ -1,6 +1,6 @@
 import type { Item, Settings } from './types';
-import { DEFAULT_SETTINGS } from './types';
-import { DEMO_ITEM_IDS, DEMO_ITEM_URLS } from './constants';
+import { DEFAULT_PROXY_URL, DEFAULT_SETTINGS } from './types';
+import { canonicalCity, DEMO_ITEM_IDS, DEMO_ITEM_URLS } from './constants';
 import { sameUrl } from './parse';
 
 export type StoreKind = 'indexeddb' | 'localstorage' | 'memory';
@@ -147,9 +147,34 @@ export async function removeStoredDemoItems(store: Store): Promise<void> {
   }
 }
 
+/** 舊版把代理預設成本機（localhost／127.0.0.1）或留空；這些都改成已部署的 Worker 並開啟 */
+export function isLegacyProxyUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !url.trim()) return true;
+  return /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(url.trim());
+}
+
+/**
+ * 讀設定並與預設合併。代理網址空白或指向 localhost／127.0.0.1 時，
+ * 改成預設 Worker 網址並開啟代理，再寫回（下次載入就是乾淨的）。
+ * 使用者自己存的其他網址與開關不會被動到。
+ */
 export async function loadSettings(store: Store): Promise<Settings> {
-  const s = await store.getKv<Partial<Settings>>('settings');
-  return { ...DEFAULT_SETTINGS, ...(s || {}) };
+  const saved = await store.getKv<Partial<Settings>>('settings');
+  if (!saved) return { ...DEFAULT_SETTINGS };
+  const merged: Settings = { ...DEFAULT_SETTINGS, ...saved };
+  if (!isLegacyProxyUrl(saved.proxyUrl)) return merged;
+  const migrated: Settings = { ...merged, proxyUrl: DEFAULT_PROXY_URL, proxyEnabled: true };
+  try { await saveSettings(store, migrated); } catch { /* 寫不回去也照常使用，下次載入再遷移 */ }
+  return migrated;
+}
+
+/** 舊版正式地區名稱（台北市…）轉成新名稱並寫回；不認得的自訂地區原樣保留 */
+export async function migrateLegacyCities(store: Store): Promise<void> {
+  const items = await store.getItems();
+  for (const it of items) {
+    const city = canonicalCity(it.city);
+    if (city !== it.city) await store.putItem({ ...it, city });
+  }
 }
 
 export async function saveSettings(store: Store, s: Settings): Promise<void> {

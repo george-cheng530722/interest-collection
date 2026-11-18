@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Item } from '../lib/types';
-import { CATEGORIES, CITIES } from '../lib/constants';
+import { CATEGORIES } from '../lib/constants';
 import { itemName } from '../lib/share';
-import { Btn, Chip, Field, SourceTag, Stars, Tag, Thumb } from './ui';
+import { Btn, Chip, CitySelect, Field, SourceTag, Stars, Tag, Thumb } from './ui';
 
 export interface DetailActions {
   back: () => void;
@@ -23,7 +23,9 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
   const [memo, setMemo] = useState(item.memo);
   const [review, setReview] = useState(item.review);
   const [saved, setSaved] = useState('');
-  useEffect(() => { setMemo(item.memo); setReview(item.review); setSaved(''); }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 打開時的地區：若是舊資料或自訂值，改選別的地區後仍可在下拉選單選回來
+  const [originalCity, setOriginalCity] = useState(item.city);
+  useEffect(() => { setMemo(item.memo); setReview(item.review); setSaved(''); setOriginalCity(item.city); }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const memoDirty = memo !== item.memo;
   const reviewDirty = review !== item.review;
 
@@ -58,7 +60,7 @@ export function Detail({ item, justAdded, checking, actions }: { item: Item; jus
         <div className="label">分類（可修正）</div>
         <div className="chips-wrap" role="group" aria-label="分類">{CATEGORIES.map((c) => <Chip key={c} label={c} active={item.category === c} onClick={() => actions.patch({ category: c })} />)}</div>
         <div className="label">地區（必填，可修正）</div>
-        <div className="chips-wrap" role="group" aria-label="地區">{CITIES.map((c) => <Chip key={c} label={c} active={item.city === c} onClick={() => actions.patch({ city: c })} />)}</div>
+        <CitySelect value={item.city} keep={originalCity} allowEmpty={false} onChange={(city) => { if (city) actions.patch({ city }); }} />
 
         {item.status === '已完成' ? (
           <section className="card-section" aria-label="評價">

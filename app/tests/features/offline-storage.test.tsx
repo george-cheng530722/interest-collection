@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import App from '../../src/App';
+import { loadSettings } from '../../src/lib/storage';
 import { IG_URL, X_URL, calledUrls, corsBlockedFetch, dialog, makeDevice, makeItem, pasteAndAdd, preload, renderApp, screen, waitFor, within } from '../helpers';
 
 afterEach(() => vi.restoreAllMocks());
+
+const PROXY_META = 'https://interest-collection-proxy.george-cheng.workers.dev/meta?url=';
 
 async function manualAdd(user: Awaited<ReturnType<typeof renderApp>>['user'], url: string, name: string) {
   await pasteAndAdd(user, url);
@@ -31,9 +34,9 @@ describe('功能: 單機儲存與離線使用', () => {
     const saved = await store.getItems();
     expect(saved.map((i) => i.name)).toEqual(['本機測試']);
     expect(store.kind).toBe('indexeddb');
-    // 唯一的網路請求是對貼文本身的讀取（GET），沒有任何上傳／同步
-    for (const [url, init] of fetchImpl.mock.calls) {
-      expect(String(url)).toBe(IG_URL);
+    // 網路請求只有讀貼文本身，以及讀不到時向預設代理查詢公開欄位（都是 GET），沒有任何上傳／同步
+    expect(calledUrls(fetchImpl)).toEqual([IG_URL, PROXY_META + encodeURIComponent(IG_URL)]);
+    for (const [, init] of fetchImpl.mock.calls) {
       expect((init as RequestInit | undefined)?.method ?? 'GET').toBe('GET');
       expect((init as RequestInit | undefined)?.body).toBeUndefined();
     }
@@ -98,42 +101,48 @@ describe('功能: 單機儲存與離線使用', () => {
     expect((await store.getItems())[0]).toMatchObject({ name: '第一則推文', manual: true, city: '其他' });
   });
 
-  it('情境: 中繼資料代理預設關閉且可被關掉', async () => {
+  it('情境: 中繼資料代理預設開啟且可被關掉', async () => {
     const device = makeDevice();
     const store = await device.open();
     await preload(store, []);
     const fetchImpl = corsBlockedFetch();
     const { user } = await renderApp({ store, fetchImpl: fetchImpl as unknown as typeof fetch });
-    const proxyCalls = () => calledUrls(fetchImpl).filter((u) => u.startsWith('http://localhost:8787'));
+    const proxyCalls = () => calledUrls(fetchImpl).filter((u) => u.startsWith(PROXY_META));
 
+    // 預設開啟，代理網址是已部署的 Worker
     await user.click(screen.getByRole('button', { name: '設定' }));
-    let sw = within(await dialog('設定')).getByRole('switch', { name: '中繼資料代理（外掛）' });
-    expect(sw).not.toBeChecked();
-    await user.click(within(await dialog('設定')).getByRole('button', { name: '關閉' }));
+    const settings = await dialog('設定');
+    expect(within(settings).getByRole('switch', { name: '中繼資料代理（外掛）' })).toBeChecked();
+    expect(within(settings).getByLabelText('代理網址')).toHaveValue('https://interest-collection-proxy.george-cheng.workers.dev');
+    expect(within(settings).queryByText(/預設關閉/)).toBeNull();
+    expect(within(settings).getByText(/預設開啟/)).toBeInTheDocument();
+    await user.click(within(settings).getByRole('button', { name: '關閉' }));
+
+    // 直接抓失敗 → 才向預設代理請求
     await pasteAndAdd(user, IG_URL);
     await user.click(within(await dialog('讀取失敗，請手動補充')).getByRole('button', { name: '取消' }));
-    expect(proxyCalls()).toHaveLength(0);
-
-    // 開啟 → 才會向代理請求
-    await user.click(screen.getByRole('button', { name: '設定' }));
-    sw = within(await dialog('設定')).getByRole('switch', { name: '中繼資料代理（外掛）' });
-    await user.click(sw);
-    await user.click(within(await dialog('設定')).getByRole('button', { name: '關閉' }));
-    await pasteAndAdd(user, IG_URL);
-    await user.click(within(await dialog('讀取失敗，請手動補充')).getByRole('button', { name: '取消' }));
-    expect(proxyCalls()).toEqual(['http://localhost:8787/meta?url=' + encodeURIComponent(IG_URL)]);
-    expect((await store.getKv<{ proxyEnabled: boolean }>('settings'))?.proxyEnabled).toBe(true);
+    expect(calledUrls(fetchImpl)[0]).toBe(IG_URL);
+    expect(proxyCalls()).toEqual([PROXY_META + encodeURIComponent(IG_URL)]);
+    expect(calledUrls(fetchImpl).some((u) => u.includes('localhost') || u.includes('8787'))).toBe(false);
 
     // 關掉 → 只直接抓，失敗就手動補充，不再向代理送出
     await user.click(screen.getByRole('button', { name: '設定' }));
-    await user.click(within(await dialog('設定')).getByRole('switch', { name: '中繼資料代理（外掛）' }));
+    const sw = within(await dialog('設定')).getByRole('switch', { name: '中繼資料代理（外掛）' });
+    await user.click(sw);
+    expect(sw).not.toBeChecked();
     await user.click(within(await dialog('設定')).getByRole('button', { name: '關閉' }));
+    expect((await store.getKv<{ proxyEnabled: boolean }>('settings'))?.proxyEnabled).toBe(false);
     const before = fetchImpl.mock.calls.length;
     await pasteAndAdd(user, X_URL);
     await dialog('讀取失敗，請手動補充');
     const after = calledUrls(fetchImpl).slice(before);
     expect(after[0]).toBe(X_URL);
-    expect(after.some((u) => u.includes('8787'))).toBe(false);
+    expect(after.some((u) => u.includes('/meta?'))).toBe(false);
     expect(proxyCalls()).toHaveLength(1);
+
+    // 重開後仍是關閉（使用者的選擇不會被改回開啟）
+    const store2 = await device.open();
+    expect(await loadSettings(store2)).toMatchObject({ proxyEnabled: false, proxyUrl: 'https://interest-collection-proxy.george-cheng.workers.dev' });
   });
+
 });
